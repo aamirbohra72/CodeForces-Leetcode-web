@@ -1,0 +1,135 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+    ADMIN
+    USER
+}
+
+enum ContestStatus {
+    UPCOMING
+    LIVE
+    ENDED
+}
+
+enum SubmissionStatus {
+    PENDING
+    ACCEPTED
+    WRONG_ANSWER
+    TIME_LIMIT_EXCEEDED
+    RUNTIME_ERROR
+    COMPILATION_ERROR
+}
+
+model User {
+    id        String   @id @default(cuid())
+    email     String   @unique
+    username  String   @unique
+    role      UserRole @default(USER)
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    submissions        Submission[]
+    leaderboardEntries LeaderboardEntry[]
+
+    @@index([email])
+    @@index([username])
+}
+
+model OTP {
+    id        String   @id @default(cuid())
+    email     String
+    code      String
+    expiresAt DateTime
+    createdAt DateTime @default(now())
+
+    @@index([email])
+    @@index([code])
+}
+
+model LeaderboardEntry {
+    id        String   @id @default(cuid())
+    userId    String
+    contestId String
+    score     Int      @default(0)
+    rank      Int?
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+    contest Contest @relation(fields: [contestId], references: [id], onDelete: Cascade)
+
+    @@unique([userId, contestId])
+    @@index([contestId, score])
+    @@index([contestId, rank])
+}
+
+model Contest {
+    id          String        @id @default(cuid())
+    name        String
+    description String?
+    startTime   DateTime
+    endTime     DateTime
+    status      ContestStatus @default(UPCOMING)
+    createdAt   DateTime      @default(now())
+    updatedAt   DateTime      @updatedAt
+
+    challenges         Challenge[]
+    leaderboardEntries LeaderboardEntry[]
+
+    @@index([status])
+    @@index([startTime])
+    @@index([endTime])
+}
+
+model Challenge {
+    id           String   @id @default(cuid())
+    contestId    String
+    title        String
+    description  String
+    difficulty   String
+    inputFormat  String
+    outputFormat String
+    constraints  String
+    sampleInput  String
+    sampleOutput String
+    createdAt    DateTime @default(now())
+    updatedAt    DateTime @updatedAt
+
+    contest     Contest      @relation(fields: [contestId], references: [id], onDelete: Cascade)
+    submissions Submission[]
+
+    @@index([contestId])
+    @@index([difficulty])
+}
+
+model Submission {
+    id          String           @id @default(cuid())
+    userId      String
+    challengeId String
+    language    String
+    sourceCode  String
+    status      SubmissionStatus @default(PENDING)
+    score       Int              @default(0)
+    aiResponse  String?
+    submittedAt DateTime         @default(now())
+    updatedAt   DateTime         @updatedAt
+
+    user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+    challenge Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
+    @@index([challengeId])
+    @@index([status])
+    @@index([submittedAt])
+    @@index([score])
+}

@@ -1,0 +1,25 @@
+{
+  "name": "@codeforces/db",
+  "version": "1.0.0",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "db:generate": "dotenv -e ../../.env -e ../../apps/api/.env -- prisma generate",
+    "db:migrate": "dotenv -e ../../.env -e ../../apps/api/.env -- prisma migrate dev",
+    "db:push": "dotenv -e ../../.env -e ../../apps/api/.env -- prisma db push",
+    "db:seed": "dotenv -e ../../.env -e ../../apps/api/.env -- tsx prisma/seed.ts",
+    "db:studio": "dotenv -e ../../.env -e ../../apps/api/.env -- prisma studio"
+  },
+  "dependencies": {
+    "@monaco-editor/react": "^4.7.0",
+    "@prisma/client": "^5.9.1",
+    "dotenv": "^16.3.1",
+    "monaco-editor": "^0.55.1"
+  },
+  "devDependencies": {
+    "dotenv-cli": "^7.4.2",
+    "prisma": "^5.9.1",
+    "tsx": "^4.7.1",
+    "typescript": "^5.3.3"
+  }
+}
