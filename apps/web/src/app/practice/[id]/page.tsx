@@ -49,22 +49,35 @@ export default function PracticeProblemPage() {
 
     setRunning(true);
     setOutput(null);
+    setError('');
+    
     try {
-      // For now, we'll do a simple client-side execution for JavaScript
-      // In production, this should call your backend execution service
-      if (language === 'javascript') {
-        try {
-          // Create a safe execution environment
-          const result = eval(`(function() { ${sourceCode} })()`);
-          setOutput({ type: 'success', message: String(result) || 'Code executed successfully' });
-        } catch (err) {
-          setOutput({ type: 'error', message: err instanceof Error ? err.message : 'Runtime error' });
-        }
+      // Call backend execution API
+      const response = await api.post<{
+        success: boolean;
+        output: string;
+        error: string | null;
+        exitCode: number;
+      }>('/execute/execute', {
+        code: sourceCode,
+        language: language,
+        timeout: 5000,
+      });
+
+      if (response.success) {
+        setOutput({ 
+          type: 'success', 
+          message: response.output || 'Code executed successfully (no output)' 
+        });
       } else {
-        setOutput({ type: 'error', message: 'Code execution is only available for JavaScript in this demo' });
+        setOutput({ 
+          type: 'error', 
+          message: response.error || 'Execution failed' 
+        });
       }
-    } catch (err) {
-      setOutput({ type: 'error', message: err instanceof Error ? err.message : 'Execution failed' });
+    } catch (err: any) {
+      const errorMessage = err?.response?.data?.error || err?.message || 'Execution failed';
+      setOutput({ type: 'error', message: errorMessage });
     } finally {
       setRunning(false);
     }
@@ -368,8 +381,10 @@ export default function PracticeProblemPage() {
               overflow: 'auto',
             }}
           >
-            <div style={{ color: '#cccccc', fontSize: '0.875rem', fontFamily: 'monospace' }}>
-              {output ? (
+            <div style={{ color: '#cccccc', fontSize: '0.875rem', fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}>
+              {running ? (
+                <div style={{ color: '#6b7280' }}>Running code...</div>
+              ) : output ? (
                 <div style={{ color: output.type === 'error' ? '#f48771' : '#4ec9b0' }}>
                   {output.message}
                 </div>

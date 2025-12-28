@@ -7,6 +7,7 @@ import { contestRoutes } from './routes/contests';
 import { challengeRoutes } from './routes/challenges';
 import { submissionRoutes } from './routes/submissions';
 import { leaderboardRoutes } from './routes/leaderboard';
+import { executionRoutes } from './routes/execution';
 import { connectRedis, disconnectRedis } from './services/redisService';
 
 dotenv.config();
@@ -23,6 +24,7 @@ app.use('/api/contests', contestRoutes);
 app.use('/api/challenges', challengeRoutes);
 app.use('/api/submissions', submissionRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
+app.use('/api/execute', executionRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
