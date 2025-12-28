@@ -47,7 +47,8 @@ export function Navbar() {
                 <span style={{ fontSize: '1.2rem' }}>🔥</span>
                 <span style={{ fontSize: '0.9rem', fontWeight: '600' }}>{streak} Day Streak</span>
               </div>
-              <div
+              <Link
+                href={`/${user.username}`}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -56,6 +57,14 @@ export function Navbar() {
                   padding: '0.25rem 0.75rem',
                   borderRadius: '20px',
                   cursor: 'pointer',
+                  textDecoration: 'none',
+                  color: 'white',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#3a3a3a';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#2a2a2a';
                 }}
               >
                 <div
@@ -75,7 +84,7 @@ export function Navbar() {
                   {user.username.charAt(0).toUpperCase()}
                 </div>
                 <span style={{ fontSize: '0.9rem' }}>{user.username}</span>
-              </div>
+              </Link>
               <button onClick={handleLogout} className="btn btn-secondary" style={{ fontSize: '0.875rem' }}>
                 Logout
               </button>
