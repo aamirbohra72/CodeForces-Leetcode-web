@@ -70,7 +70,7 @@ export default function ChallengePage() {
     return (
       <>
         <Navbar />
-        <div className="container">Loading...</div>
+        <div className="container" style={{ background: '#1a1a1a', color: 'white', minHeight: 'calc(100vh - 60px)', padding: '2rem' }}>Loading...</div>
       </>
     );
   }
@@ -79,7 +79,7 @@ export default function ChallengePage() {
     return (
       <>
         <Navbar />
-        <div className="container">Challenge not found</div>
+        <div className="container" style={{ background: '#1a1a1a', color: 'white', minHeight: 'calc(100vh - 60px)', padding: '2rem' }}>Challenge not found</div>
       </>
     );
   }
@@ -87,53 +87,54 @@ export default function ChallengePage() {
   return (
     <>
       <Navbar />
-      <div className="container">
-        <h1>{challenge.title}</h1>
-        <p style={{ marginTop: '0.5rem', marginBottom: '1rem' }}>
+      <div className="container" style={{ background: '#1a1a1a', color: 'white', minHeight: 'calc(100vh - 60px)', padding: '2rem' }}>
+        <h1 style={{ color: 'white', marginBottom: '0.5rem' }}>{challenge.title}</h1>
+        <p style={{ marginTop: '0.5rem', marginBottom: '1rem', color: '#9ca3af' }}>
           Difficulty: {challenge.difficulty} | Contest: {challenge.contest?.name || 'N/A'}
         </p>
 
-        <div className="card" style={{ marginBottom: '2rem' }}>
-          <h2>Description</h2>
-          <p style={{ whiteSpace: 'pre-wrap', marginTop: '1rem' }}>{challenge.description}</p>
+        <div className="card" style={{ marginBottom: '2rem', background: '#2a2a2a', color: 'white' }}>
+          <h2 style={{ color: 'white' }}>Description</h2>
+          <p style={{ whiteSpace: 'pre-wrap', marginTop: '1rem', color: '#e5e7eb' }}>{challenge.description}</p>
 
-          <h3 style={{ marginTop: '2rem' }}>Input Format</h3>
-          <pre style={{ background: '#f5f5f5', padding: '1rem', borderRadius: '4px', marginTop: '0.5rem' }}>
+          <h3 style={{ marginTop: '2rem', color: 'white' }}>Input Format</h3>
+          <pre style={{ background: '#1a1a1a', color: '#e5e7eb', padding: '1rem', borderRadius: '4px', marginTop: '0.5rem', border: '1px solid #3a3a3a' }}>
             {challenge.inputFormat}
           </pre>
 
-          <h3 style={{ marginTop: '1.5rem' }}>Output Format</h3>
-          <pre style={{ background: '#f5f5f5', padding: '1rem', borderRadius: '4px', marginTop: '0.5rem' }}>
+          <h3 style={{ marginTop: '1.5rem', color: 'white' }}>Output Format</h3>
+          <pre style={{ background: '#1a1a1a', color: '#e5e7eb', padding: '1rem', borderRadius: '4px', marginTop: '0.5rem', border: '1px solid #3a3a3a' }}>
             {challenge.outputFormat}
           </pre>
 
-          <h3 style={{ marginTop: '1.5rem' }}>Constraints</h3>
-          <pre style={{ background: '#f5f5f5', padding: '1rem', borderRadius: '4px', marginTop: '0.5rem' }}>
+          <h3 style={{ marginTop: '1.5rem', color: 'white' }}>Constraints</h3>
+          <pre style={{ background: '#1a1a1a', color: '#e5e7eb', padding: '1rem', borderRadius: '4px', marginTop: '0.5rem', border: '1px solid #3a3a3a' }}>
             {challenge.constraints}
           </pre>
 
-          <h3 style={{ marginTop: '1.5rem' }}>Sample Input</h3>
-          <pre style={{ background: '#f5f5f5', padding: '1rem', borderRadius: '4px', marginTop: '0.5rem' }}>
+          <h3 style={{ marginTop: '1.5rem', color: 'white' }}>Sample Input</h3>
+          <pre style={{ background: '#1a1a1a', color: '#e5e7eb', padding: '1rem', borderRadius: '4px', marginTop: '0.5rem', border: '1px solid #3a3a3a' }}>
             {challenge.sampleInput || 'N/A'}
           </pre>
 
-          <h3 style={{ marginTop: '1.5rem' }}>Sample Output</h3>
-          <pre style={{ background: '#f5f5f5', padding: '1rem', borderRadius: '4px', marginTop: '0.5rem' }}>
+          <h3 style={{ marginTop: '1.5rem', color: 'white' }}>Sample Output</h3>
+          <pre style={{ background: '#1a1a1a', color: '#e5e7eb', padding: '1rem', borderRadius: '4px', marginTop: '0.5rem', border: '1px solid #3a3a3a' }}>
             {challenge.sampleOutput || 'N/A'}
           </pre>
         </div>
 
-        <div className="card">
-          <h2>Submit Solution</h2>
-          {error && <div style={{ color: 'red', marginTop: '1rem' }}>{error}</div>}
+        <div className="card" style={{ background: '#2a2a2a', color: 'white' }}>
+          <h2 style={{ color: 'white' }}>Submit Solution</h2>
+          {error && <div style={{ color: '#f48771', marginTop: '1rem' }}>{error}</div>}
           <form onSubmit={handleSubmit} style={{ marginTop: '1rem' }}>
             <div className="form-group">
-              <label htmlFor="language">Language</label>
+              <label htmlFor="language" style={{ color: 'white' }}>Language</label>
               <select
                 id="language"
                 value={language}
                 onChange={(e) => setLanguage(e.target.value)}
                 required
+                style={{ background: '#1a1a1a', color: 'white', border: '1px solid #3a3a3a' }}
               >
                 <option value="javascript">JavaScript</option>
                 <option value="python">Python</option>
@@ -142,14 +143,14 @@ export default function ChallengePage() {
               </select>
             </div>
             <div className="form-group">
-              <label htmlFor="sourceCode">Source Code</label>
+              <label htmlFor="sourceCode" style={{ color: 'white' }}>Source Code</label>
               <textarea
                 id="sourceCode"
                 value={sourceCode}
                 onChange={(e) => setSourceCode(e.target.value)}
                 required
                 rows={15}
-                style={{ fontFamily: 'monospace' }}
+                style={{ fontFamily: 'monospace', background: '#1a1a1a', color: '#e5e7eb', border: '1px solid #3a3a3a' }}
               />
             </div>
             <button type="submit" className="btn btn-primary" disabled={submitting}>
