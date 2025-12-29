@@ -85,6 +85,7 @@ export default function PracticeProblemPage() {
 
   const handleSubmit = async () => {
     setError('');
+    setOutput(null);
 
     if (!isAuthenticated()) {
       router.push('/login');
@@ -93,19 +94,35 @@ export default function PracticeProblemPage() {
 
     if (!sourceCode.trim()) {
       setError('Source code is required');
+      setOutput({ type: 'error', message: 'Please write some code before submitting' });
       return;
     }
 
     setSubmitting(true);
     try {
-      await api.post(`/submissions`, {
+      const response = await api.post(`/submissions`, {
         challengeId: problemId,
         language,
         sourceCode,
       });
-      router.push('/submissions');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Submission failed');
+      
+      // Show success message
+      setOutput({ 
+        type: 'success', 
+        message: `Submission successful! Status: ${response.status || 'PENDING'}. Redirecting to submissions...` 
+      });
+      
+      // Redirect after a short delay
+      setTimeout(() => {
+        router.push('/submissions');
+      }, 1500);
+    } catch (err: any) {
+      const errorMessage = err?.response?.data?.error || err?.message || 'Submission failed';
+      setError(errorMessage);
+      setOutput({ 
+        type: 'error', 
+        message: `Submission failed: ${errorMessage}` 
+      });
     } finally {
       setSubmitting(false);
     }

@@ -206,17 +206,17 @@ export const submissionController = {
         return;
       }
 
-      // Check if contest is LIVE
-      if (challenge.contest.status !== 'LIVE') {
-        res.status(400).json({ error: 'Contest is not currently live' });
-        return;
-      }
-
-      // Check if contest has started
-      const now = new Date();
-      if (now < challenge.contest.startTime || now > challenge.contest.endTime) {
-        res.status(400).json({ error: 'Contest is not currently active' });
-        return;
+      // For contest submissions, check if contest is LIVE and active
+      // For practice problems, allow submissions regardless of contest status
+      const isContestSubmission = challenge.contest.status === 'LIVE';
+      
+      if (isContestSubmission) {
+        // Check if contest has started and not ended
+        const now = new Date();
+        if (now < challenge.contest.startTime || now > challenge.contest.endTime) {
+          res.status(400).json({ error: 'Contest is not currently active' });
+          return;
+        }
       }
 
       // Create submission with PENDING status
@@ -257,8 +257,8 @@ export const submissionController = {
             },
           });
 
-          // If accepted, update leaderboard in Redis
-          if (result.status === 'ACCEPTED') {
+          // If accepted and it's a contest submission, update leaderboard in Redis
+          if (result.status === 'ACCEPTED' && isContestSubmission) {
             await addToLeaderboard(challenge.contest.id, req.user.userId, result.score);
           }
         })
