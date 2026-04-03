@@ -2,8 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Navbar } from '@/components/Navbar';
-import { Sidebar } from '@/components/Sidebar';
+import { DashboardShell } from '@/components/DashboardShell';
 
 interface Course {
   id: string;
@@ -105,20 +104,7 @@ export default function LearnPage() {
   ];
 
   return (
-    <>
-      <Navbar />
-      <div style={{ display: 'flex', minHeight: 'calc(100vh - 60px)' }}>
-        <Sidebar />
-        <main
-          style={{
-            marginLeft: '240px',
-            flex: 1,
-            background: '#1a1a1a',
-            color: 'white',
-            padding: '2rem',
-            minHeight: 'calc(100vh - 60px)',
-          }}
-        >
+    <DashboardShell navClassName="sticky top-0 z-50" mainClassName="min-h-0 overflow-y-auto p-8">
           <div style={{ marginBottom: '2rem' }}>
             <h1 style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>Courses</h1>
             <p style={{ color: '#b0b0b0', fontSize: '1rem' }}>Learn and master new skills</p>
@@ -340,9 +326,7 @@ export default function LearnPage() {
               No courses found in this category.
             </div>
           )}
-        </main>
-      </div>
-    </>
+    </DashboardShell>
   );
 }
 

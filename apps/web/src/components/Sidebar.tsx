@@ -11,6 +11,7 @@ interface SidebarItem {
 }
 
 const sidebarItems: SidebarItem[] = [
+  { label: 'Home', href: '/', icon: '🏠' },
   { label: 'Courses', href: '/learn', icon: '📚' },
   { label: 'Blog', href: '/blog', icon: '✍️' },
   { label: 'Gift a course', href: '/gift', icon: '🎁' },
@@ -43,7 +44,10 @@ export function Sidebar() {
     >
       <nav>
         {sidebarItems.map((item) => {
-          const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
+          const isActive =
+            item.href === '/'
+              ? pathname === '/'
+              : pathname === item.href || pathname?.startsWith(item.href + '/');
           return (
             <Link
               key={item.href}
