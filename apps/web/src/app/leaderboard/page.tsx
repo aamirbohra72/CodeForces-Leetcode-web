@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Navbar } from '@/components/Navbar';
+import { DashboardShell } from '@/components/DashboardShell';
 import { getUser } from '@/lib/auth';
 
 const mockStreakData = { currentStreak: 0, longestStreak: 1 };
@@ -59,9 +59,8 @@ export default function LeaderboardPage() {
   const avatarColor = colors[hash % colors.length];
 
   return (
-    <>
-      <Navbar />
-      <div style={{ background: '#1a1a1a', color: 'white', minHeight: 'calc(100vh - 60px)', padding: '2rem' }}>
+    <DashboardShell mainClassName="min-h-0 overflow-y-auto p-8">
+      <div style={{ color: 'white' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'grid', gridTemplateColumns: '300px 1fr', gap: '2rem' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             <div
@@ -201,6 +200,6 @@ export default function LeaderboardPage() {
           </div>
         </div>
       </div>
-    </>
+    </DashboardShell>
   );
 }

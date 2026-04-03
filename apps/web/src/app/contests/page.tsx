@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
-import { Navbar } from '@/components/Navbar';
+import { DashboardShell } from '@/components/DashboardShell';
 import type { Contest, ContestStatus } from '@codeforces/types';
 
 export default function ContestsPage() {
@@ -43,23 +43,21 @@ export default function ContestsPage() {
 
   if (loading) {
     return (
-      <>
-        <Navbar />
-        <div className="container">Loading...</div>
-      </>
+      <DashboardShell mainClassName="p-8">
+        <div className="container text-white">Loading...</div>
+      </DashboardShell>
     );
   }
 
   return (
-    <>
-      <Navbar />
-      <div className="container">
+    <DashboardShell mainClassName="p-8">
+      <div className="container text-white">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
           <h1>Contests</h1>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as ContestStatus | '')}
-            style={{ padding: '0.5rem' }}
+            className="rounded border border-[#3a3a3a] bg-[#2a2a2a] px-3 py-2 text-sm text-white"
           >
             <option value="">All Status</option>
             <option value="UPCOMING">Upcoming</option>
@@ -102,7 +100,7 @@ export default function ContestsPage() {
           </div>
         )}
       </div>
-    </>
+    </DashboardShell>
   );
 }
 

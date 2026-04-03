@@ -1,7 +1,7 @@
 'use client';
 
 import { Fragment, useEffect, useMemo, useState } from 'react';
-import { AppNavbar } from '@/components/AppNavbar';
+import { DashboardShell } from '@/components/DashboardShell';
 import styles from './projects.module.css';
 
 type Difficulty = 'Easy' | 'Medium' | 'Hard';
@@ -421,10 +421,9 @@ export default function ProjectsPage() {
   };
 
   return (
-    <div className={styles.page}>
-      <AppNavbar className="shrink-0" />
-
-      <div className={styles.toolbar}>
+    <DashboardShell mainClassName="flex min-h-0 flex-1 flex-col overflow-hidden p-0">
+      <div className={styles.page}>
+        <div className={styles.toolbar}>
         <div className={styles.toolbarInner}>
           <h1 className={styles.toolbarTitle}>All Projects</h1>
           <div className={styles.filtersRow}>
@@ -472,12 +471,12 @@ export default function ProjectsPage() {
             </button>
           </div>
         </div>
-      </div>
+        </div>
 
-      <div className={styles.layout}>
+        <div className={styles.layout}>
         <div className={styles.listCol} role="list">
           {filtered.length === 0 ? (
-            <p style={{ padding: '1rem', color: '#6b7280' }}>No projects match your filters.</p>
+            <p style={{ padding: '1rem', color: '#9ca3af' }}>No projects match your filters.</p>
           ) : (
             filtered.map((p) => (
               <button
@@ -513,7 +512,7 @@ export default function ProjectsPage() {
 
         <article className={styles.detail}>
           {filtered.length === 0 ? (
-            <p style={{ margin: 0, color: '#6b7280' }}>No project selected. Adjust filters to see ideas.</p>
+            <p style={{ margin: 0, color: '#9ca3af' }}>No project selected. Adjust filters to see ideas.</p>
           ) : (
             <>
               <div className={styles.detailHeader}>
@@ -615,7 +614,8 @@ export default function ProjectsPage() {
             </>
           )}
         </article>
+        </div>
       </div>
-    </div>
+    </DashboardShell>
   );
 }

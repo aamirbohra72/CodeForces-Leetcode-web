@@ -1,17 +1,18 @@
 .page {
-  min-height: 100vh;
-  height: 100vh;
+  min-height: 0;
+  flex: 1;
+  height: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: #f4f6f8;
-  color: #111827;
+  background: #1a1a1a;
+  color: #e5e7eb;
 }
 
 .toolbar {
   flex-shrink: 0;
-  background: #fff;
-  border-bottom: 1px solid #e5e7eb;
+  background: #2a2a2a;
+  border-bottom: 1px solid #3a3a3a;
   padding: 1rem 1.25rem 1.25rem;
 }
 
@@ -24,6 +25,7 @@
   margin: 0 0 1rem;
   font-size: 1.35rem;
   font-weight: 700;
+  color: #f9fafb;
 }
 
 .filtersRow {
@@ -35,14 +37,14 @@
 
 .select {
   padding: 0.5rem 2rem 0.5rem 0.75rem;
-  border: 1px solid #d1d5db;
+  border: 1px solid #3a3a3a;
   border-radius: 8px;
-  background: #fff;
+  background-color: #1a1a1a;
   font-size: 0.875rem;
-  color: #374151;
+  color: #e5e7eb;
   cursor: pointer;
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%236b7280' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10l-5 5z'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%239ca3af' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10l-5 5z'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 0.6rem center;
 }
@@ -57,10 +59,12 @@
 .searchWrap input {
   width: 100%;
   padding: 0.5rem 0.75rem 0.5rem 2.25rem;
-  border: 1px solid #d1d5db;
+  border: 1px solid #3a3a3a;
   border-radius: 8px;
   font-size: 0.875rem;
   box-sizing: border-box;
+  background: #1a1a1a;
+  color: #e5e7eb;
 }
 
 .searchIcon {
@@ -75,18 +79,18 @@
 .iconBtn {
   width: 40px;
   height: 40px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #3a3a3a;
   border-radius: 8px;
-  background: #fff;
+  background: #2a2a2a;
   cursor: pointer;
   display: grid;
   place-items: center;
   font-size: 1rem;
-  color: #4b5563;
+  color: #9ca3af;
 }
 
 .iconBtn:hover {
-  background: #f9fafb;
+  background: #333;
 }
 
 .pillBtn {
@@ -94,16 +98,16 @@
   align-items: center;
   gap: 6px;
   padding: 0.5rem 0.85rem;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #3a3a3a;
   border-radius: 8px;
-  background: #fff;
+  background: #2a2a2a;
   font-size: 0.875rem;
   cursor: pointer;
-  color: #374151;
+  color: #e5e7eb;
 }
 
 .pillBtn:hover {
-  background: #f9fafb;
+  background: #333;
 }
 
 .spacer {
@@ -160,8 +164,8 @@
 }
 
 .card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
   border-radius: 12px;
   padding: 1rem 1.1rem;
   cursor: pointer;
@@ -170,14 +174,14 @@
 }
 
 .card:hover {
-  border-color: #cbd5e1;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border-color: #4b5563;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
 }
 
 .cardSelected {
-  border-color: #38bdf8;
-  background: #eff6ff;
-  box-shadow: 0 0 0 1px #38bdf8;
+  border-color: #22c55e;
+  background: rgba(34, 197, 94, 0.12);
+  box-shadow: 0 0 0 1px #22c55e;
 }
 
 .cardTop {
@@ -193,7 +197,7 @@
   font-size: 0.95rem;
   font-weight: 700;
   line-height: 1.35;
-  color: #111827;
+  color: #f9fafb;
 }
 
 .diffEasy {
@@ -224,7 +228,7 @@
 .cardDesc {
   margin: 0 0 0.75rem;
   font-size: 0.8rem;
-  color: #6b7280;
+  color: #9ca3af;
   line-height: 1.45;
 }
 
@@ -253,8 +257,8 @@
 }
 
 .detail {
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
   border-radius: 12px;
   padding: 1.25rem 1.5rem;
   min-height: 0;
@@ -277,7 +281,7 @@
   font-size: 1.35rem;
   font-weight: 800;
   line-height: 1.25;
-  color: #111827;
+  color: #f9fafb;
 }
 
 .detailActions {
@@ -292,7 +296,7 @@
   align-items: center;
   margin-bottom: 1rem;
   font-size: 0.875rem;
-  color: #6b7280;
+  color: #9ca3af;
 }
 
 .metaItem {
@@ -304,7 +308,7 @@
 .detailIntro {
   margin: 0 0 1.25rem;
   font-size: 0.95rem;
-  color: #4b5563;
+  color: #d1d5db;
   line-height: 1.55;
 }
 
@@ -328,27 +332,27 @@
 }
 
 .boxDomains {
-  background: #f5f3ff;
-  border-color: #ddd6fe;
+  background: rgba(91, 33, 182, 0.15);
+  border-color: #6d28d9;
 }
 
 .boxTech {
-  background: #f0f9ff;
-  border-color: #bae6fd;
+  background: rgba(3, 105, 161, 0.15);
+  border-color: #0284c7;
 }
 
 .box h4 {
   margin: 0 0 0.65rem;
   font-size: 0.8rem;
   font-weight: 700;
-  color: #374151;
+  color: #e5e7eb;
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
 .detailsSection {
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid #3a3a3a;
   padding-top: 1rem;
 }
 
@@ -356,6 +360,7 @@
   margin: 0 0 0.75rem;
   font-size: 1rem;
   font-weight: 700;
+  color: #e5e7eb;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -365,7 +370,7 @@
   margin: 1.25rem 0 0.5rem;
   font-size: 0.95rem;
   font-weight: 700;
-  color: #111827;
+  color: #f3f4f6;
 }
 
 .detailsSection h4:first-child {
@@ -376,13 +381,13 @@
   margin: 1rem 0 0.35rem;
   font-size: 0.85rem;
   font-weight: 700;
-  color: #1f2937;
+  color: #d1d5db;
 }
 
 .blockParagraphs {
   margin: 0 0 0.75rem;
   font-size: 0.875rem;
-  color: #4b5563;
+  color: #9ca3af;
   line-height: 1.65;
 }
 
@@ -393,7 +398,7 @@
 .detailsSection ul {
   margin: 0 0 0.75rem;
   padding-left: 1.25rem;
-  color: #4b5563;
+  color: #9ca3af;
   font-size: 0.875rem;
   line-height: 1.65;
 }
@@ -413,7 +418,7 @@
 }
 
 .resourceList a {
-  color: #2563eb;
+  color: #60a5fa;
   font-size: 0.875rem;
   word-break: break-word;
 }
@@ -424,5 +429,5 @@
 
 .em {
   font-weight: 700;
-  color: #111827;
+  color: #f9fafb;
 }

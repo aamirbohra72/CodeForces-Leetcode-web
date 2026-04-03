@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
-import { Navbar } from '@/components/Navbar';
+import { DashboardShell } from '@/components/DashboardShell';
 import type { Challenge } from '@codeforces/types';
 import styles from './practice.module.css';
 
@@ -58,8 +58,7 @@ export default function PracticePage() {
   };
 
   return (
-    <>
-      <Navbar />
+    <DashboardShell mainClassName="min-h-0 overflow-y-auto p-0">
       <div className={styles.wrap}>
         <header className={styles.hero}>
           <div className={styles.heroInner}>
@@ -141,6 +140,6 @@ export default function PracticePage() {
           )}
         </div>
       </div>
-    </>
+    </DashboardShell>
   );
 }

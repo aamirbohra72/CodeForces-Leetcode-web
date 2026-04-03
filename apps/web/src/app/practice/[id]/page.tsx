@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { isAuthenticated } from '@/lib/auth';
-import { Navbar } from '@/components/Navbar';
+import { DashboardShell } from '@/components/DashboardShell';
 import { CodeEditor } from '@/components/CodeEditor';
 import type { Challenge } from '@codeforces/types';
 
@@ -130,26 +130,23 @@ export default function PracticeProblemPage() {
 
   if (loading) {
     return (
-      <>
-        <Navbar />
-        <div className="container" style={{ padding: '2rem', textAlign: 'center' }}>Loading...</div>
-      </>
+      <DashboardShell mainClassName="p-8">
+        <div className="text-center">Loading...</div>
+      </DashboardShell>
     );
   }
 
   if (!challenge) {
     return (
-      <>
-        <Navbar />
-        <div className="container" style={{ padding: '2rem' }}>Challenge not found</div>
-      </>
+      <DashboardShell mainClassName="p-8">
+        <div>Challenge not found</div>
+      </DashboardShell>
     );
   }
 
   return (
-    <>
-      <Navbar />
-      <div style={{ display: 'flex', height: 'calc(100vh - 60px)', overflow: 'hidden' }}>
+    <DashboardShell mainClassName="flex min-h-[calc(100vh-3.5rem)] flex-col overflow-hidden p-0">
+      <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
         {/* Left Panel - Problem Description */}
         <div
           style={{
@@ -413,7 +410,7 @@ export default function PracticeProblemPage() {
           </div>
         </div>
       </div>
-    </>
+    </DashboardShell>
   );
 }
 
