@@ -2,8 +2,64 @@ import { Response } from 'express';
 import { prisma } from '@codeforces/db';
 import { AuthRequest } from '../middleware/auth';
 import { getLeaderboard, getUserRank } from '../services/redisService';
+import {
+  getGlobalLeaderboard,
+  getUserAggregateStats,
+  getUserOverview,
+} from '../services/leaderboardOverviewService';
 
 export const leaderboardController = {
+  async getOverview(req: AuthRequest, res: Response): Promise<void> {
+    const yearRaw = req.query.year;
+    const year =
+      typeof yearRaw === 'string' && /^\d{4}$/.test(yearRaw)
+        ? parseInt(yearRaw, 10)
+        : new Date().getFullYear();
+
+    const globalLeaderboard = await getGlobalLeaderboard(100);
+
+    if (!req.user?.userId) {
+      res.json({
+        year,
+        globalLeaderboard,
+        me: null,
+        courseWatchTime: [] as { course: string; hours: number }[],
+      });
+      return;
+    }
+
+    const userId = req.user.userId;
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, username: true },
+    });
+
+    const personal = await getUserOverview(userId, year);
+    const myRow = globalLeaderboard.find((r) => r.userId === userId);
+    const agg = myRow
+      ? {
+          uniqueSolved: myRow.uniqueSolved,
+          acceptedSubmissions: myRow.acceptedSubmissions,
+          scoreSum: myRow.scoreSum,
+        }
+      : await getUserAggregateStats(userId);
+
+    res.json({
+      year,
+      globalLeaderboard,
+      me: {
+        userId,
+        username: user?.username ?? 'You',
+        rank: myRow?.rank ?? null,
+        uniqueSolved: agg.uniqueSolved,
+        acceptedSubmissions: agg.acceptedSubmissions,
+        scoreSum: agg.scoreSum,
+        ...personal,
+      },
+      courseWatchTime: [] as { course: string; hours: number }[],
+    });
+  },
+
   async getContestLeaderboard(req: AuthRequest, res: Response): Promise<void> {
     try {
       const { contestId } = req.params;

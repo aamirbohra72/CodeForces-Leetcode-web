@@ -1,204 +1,318 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { DashboardShell } from '@/components/DashboardShell';
+import { api } from '@/lib/api';
 import { getUser } from '@/lib/auth';
+import type { LeaderboardOverviewResponse } from '@/lib/leaderboard-overview';
 
-const mockStreakData = { currentStreak: 0, longestStreak: 1 };
-const mockContributions = {
-  year: 2025,
-  totalContributions: 2,
-  contributions: Array.from({ length: 365 }, (_, i) => {
-    const date = new Date(2025, 0, 1);
-    date.setDate(date.getDate() + i);
-    return {
-      date: date.toISOString().split('T')[0],
-      count: Math.random() > 0.95 ? Math.floor(Math.random() * 5) + 1 : 0,
-    };
-  }),
-};
+function getContributionLevel(count: number) {
+  if (count === 0) return '#161b22';
+  if (count === 1) return '#0e4429';
+  if (count === 2) return '#006d32';
+  if (count === 3) return '#26a641';
+  return '#39d353';
+}
 
-const mockStats = {
-  interviewPractice: {
-    total: { solved: 1, total: 188 },
-    easy: { solved: 0, total: 74 },
-    medium: { solved: 1, total: 89 },
-    hard: { solved: 0, total: 25 },
-  },
-  courseWatchTime: [{ course: 'Namaste React', time: 0.068 }],
-};
-
-export default function LeaderboardPage() {
-  const currentUser = getUser();
-  const username = currentUser?.username ?? 'leaderboard';
-  const [selectedYear, setSelectedYear] = useState(mockContributions.year);
-
-  const getContributionLevel = (count: number) => {
-    if (count === 0) return '#161b22';
-    if (count === 1) return '#0e4429';
-    if (count === 2) return '#006d32';
-    if (count === 3) return '#26a641';
-    return '#39d353';
-  };
-
-  const weeks: { [key: string]: typeof mockContributions.contributions } = {};
-  mockContributions.contributions.forEach((contrib) => {
-    const date = new Date(contrib.date);
+function buildWeeksFromDays(days: { date: string; count: number }[]) {
+  const weeks: Record<string, typeof days> = {};
+  days.forEach((contrib) => {
+    const date = new Date(contrib.date + 'T12:00:00');
     const weekStart = new Date(date);
     weekStart.setDate(date.getDate() - date.getDay());
     const weekKey = weekStart.toISOString().split('T')[0];
     if (!weeks[weekKey]) weeks[weekKey] = [];
     weeks[weekKey].push(contrib);
   });
+  return weeks;
+}
 
-  const weekKeys = Object.keys(weeks).sort().slice(-52);
-  const getPercentage = (solved: number, total: number) => (total > 0 ? Math.round((solved / total) * 100) : 0);
+const CURRENT_YEAR = new Date().getFullYear();
+const YEAR_OPTIONS = Array.from({ length: 6 }, (_, i) => CURRENT_YEAR - i);
+
+export default function LeaderboardPage() {
+  const [year, setYear] = useState(() => new Date().getFullYear());
+  const [data, setData] = useState<LeaderboardOverviewResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await api.get<LeaderboardOverviewResponse>(`/leaderboard/overview?year=${year}`);
+      setData(res);
+    } catch (e) {
+      setData(null);
+      setError(e instanceof Error ? e.message : 'Failed to load leaderboard');
+    } finally {
+      setLoading(false);
+    }
+  }, [year]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  const clientUser = getUser();
+  const displayName = data?.me?.username ?? clientUser?.username ?? 'Guest';
+  const meId = data?.me?.userId ?? clientUser?.id;
 
   const colors = ['#14b8a6', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899', '#f97316', '#eab308'];
-  const hash = username.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const hash = displayName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
   const avatarColor = colors[hash % colors.length];
 
+  const contributionDays = data?.me?.contributions.days ?? [];
+  const weeks = useMemo(() => buildWeeksFromDays(contributionDays), [contributionDays]);
+  const weekKeys = useMemo(() => Object.keys(weeks).sort().slice(-52), [weeks]);
+
+  const practice = data?.me?.practiceByDifficulty;
+  const getPercentage = (solved: number, total: number) => (total > 0 ? Math.round((solved / total) * 100) : 0);
+
+  const statRings = practice
+    ? [
+        { label: 'Total Solved', ...practice.total },
+        { label: 'Easy Solved', ...practice.easy },
+        { label: 'Medium Solved', ...practice.medium },
+        { label: 'Hard Solved', ...practice.hard },
+      ]
+    : [];
+
+  const watch = data?.courseWatchTime ?? [];
+  const maxWatch = Math.max(...watch.map((w) => w.hours), 0.01);
+
   return (
-    <DashboardShell mainClassName="min-h-0 overflow-y-auto p-8">
-      <div style={{ color: 'white' }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'grid', gridTemplateColumns: '300px 1fr', gap: '2rem' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            <div
-              style={{
-                width: '150px',
-                height: '150px',
-                borderRadius: '50%',
-                background: avatarColor,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'white',
-                fontSize: '3rem',
-                fontWeight: 'bold',
-                margin: '0 auto',
-              }}
-            >
-              {username.charAt(0).toUpperCase()}
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'center' }}>
-              <h1 style={{ fontSize: '1.5rem', fontWeight: '600', margin: 0, textTransform: 'capitalize' }}>
-                Leaderboard
-              </h1>
-            </div>
-
-            <div style={{ background: '#2a2a2a', borderRadius: '8px', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span>🚀</span>
-                <h3 style={{ fontSize: '1rem', fontWeight: '600', margin: 0 }}>Your Streak</h3>
-              </div>
-              <div style={{ background: '#1a1a1a', borderRadius: '6px', padding: '1rem', border: '1px solid #3a3a3a' }}>
-                <div style={{ fontSize: '0.875rem', color: '#9ca3af', marginBottom: '0.5rem' }}>Current Streak</div>
-                <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#22c55e' }}>{mockStreakData.currentStreak} days</div>
-              </div>
-              <div style={{ background: '#1a1a1a', borderRadius: '6px', padding: '1rem', border: '1px solid #3a3a3a' }}>
-                <div style={{ fontSize: '0.875rem', color: '#9ca3af', marginBottom: '0.5rem' }}>Longest Streak</div>
-                <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#f97316' }}>{mockStreakData.longestStreak} day</div>
-              </div>
-            </div>
+    <DashboardShell mainClassName="min-h-0 overflow-y-auto p-4 sm:p-6 lg:p-8">
+      <div className="mx-auto max-w-6xl text-white">
+        {error ? (
+          <div className="mb-6 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+            {error}{' '}
+            <button type="button" className="underline" onClick={() => void refresh()}>
+              Retry
+            </button>
           </div>
+        ) : null}
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            <div style={{ background: '#2a2a2a', borderRadius: '8px', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span>☰</span>
-                  <h3 style={{ fontSize: '1rem', fontWeight: '600', margin: 0 }}>Contributions</h3>
+        {loading && !data ? (
+          <p className="text-white/60">Loading leaderboard…</p>
+        ) : null}
+
+        {data ? (
+          <div className="grid gap-8 lg:grid-cols-[280px_1fr]">
+            <div className="flex flex-col gap-6">
+              <div
+                className="mx-auto flex h-36 w-36 items-center justify-center rounded-full text-4xl font-bold text-white shadow-lg"
+                style={{ background: avatarColor }}
+              >
+                {displayName.charAt(0).toUpperCase()}
+              </div>
+              <div className="text-center">
+                <h1 className="font-nav-brand text-xl font-semibold capitalize">{displayName}</h1>
+                {data.me?.rank != null ? (
+                  <p className="mt-1 text-sm text-green-400">Platform rank #{data.me.rank}</p>
+                ) : data.me ? (
+                  <p className="mt-1 text-sm text-white/45">Outside top 100 — keep solving!</p>
+                ) : (
+                  <p className="mt-1 text-sm text-white/45">
+                    <Link href="/login" className="text-green-400 hover:underline">
+                      Sign in
+                    </Link>{' '}
+                    for your stats
+                  </p>
+                )}
+              </div>
+
+              <div className="rounded-lg border border-[#3a3a3a] bg-[#2a2a2a] p-4">
+                <div className="mb-3 flex items-center gap-2">
+                  <span aria-hidden>🚀</span>
+                  <h2 className="text-base font-semibold">Your streak</h2>
                 </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
-                <span style={{ fontSize: '0.875rem', color: '#9ca3af' }}>{mockContributions.totalContributions} contributions in</span>
-                <span>🔥</span>
-                <span>ℹ️</span>
-                <select
-                  value={selectedYear}
-                  onChange={(e) => setSelectedYear(parseInt(e.target.value, 10))}
-                  style={{ background: '#1a1a1a', border: '1px solid #3a3a3a', color: 'white', padding: '0.25rem 0.5rem', borderRadius: '4px', fontSize: '0.875rem', cursor: 'pointer' }}
-                >
-                  <option value={2025}>2025</option>
-                  <option value={2024}>2024</option>
-                  <option value={2023}>2023</option>
-                </select>
-              </div>
-              <div style={{ marginTop: '1rem', overflowX: 'auto' }}>
-                <div style={{ display: 'flex', gap: '2px', alignItems: 'flex-start' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginRight: '0.5rem' }}>
-                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-                      <div key={day} style={{ width: '12px', height: '12px', fontSize: '0.7rem', color: '#9ca3af' }}>
-                        {day === 'Sun' || day === 'Wed' || day === 'Fri' ? day[0] : ''}
-                      </div>
-                    ))}
+                <div className="space-y-3">
+                  <div className="rounded-md border border-[#3a3a3a] bg-[#1a1a1a] p-3">
+                    <div className="text-xs text-[#9ca3af]">Current streak</div>
+                    <div className="text-2xl font-bold text-green-400">
+                      {data.me ? `${data.me.streak.current} days` : '—'}
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', gap: '2px', flexWrap: 'wrap', width: 'calc(100% - 50px)' }}>
-                    {weekKeys.map((weekKey) => {
-                      const weekContribs = weeks[weekKey];
-                      return weekContribs.map((contrib, dayIndex) => (
-                        <div
-                          key={`${weekKey}-${dayIndex}`}
-                          style={{ width: '12px', height: '12px', borderRadius: '2px', background: getContributionLevel(contrib.count), border: '1px solid #161b22' }}
-                          title={`${contrib.count} contributions on ${contrib.date}`}
-                        />
-                      ));
-                    })}
+                  <div className="rounded-md border border-[#3a3a3a] bg-[#1a1a1a] p-3">
+                    <div className="text-xs text-[#9ca3af]">Longest streak</div>
+                    <div className="text-2xl font-bold text-orange-400">
+                      {data.me ? `${data.me.streak.longest} days` : '—'}
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div style={{ background: '#2a2a2a', borderRadius: '8px', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-                  <span>🔗</span>
-                  <h3 style={{ fontSize: '1rem', fontWeight: '600', margin: 0 }}>Interview Practice Platform Questions</h3>
+            <div className="flex min-w-0 flex-col gap-6">
+              <div className="rounded-lg border border-[#3a3a3a] bg-[#2a2a2a] p-4 sm:p-5">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span aria-hidden>🏆</span>
+                    <h2 className="text-base font-semibold">Platform leaderboard</h2>
+                  </div>
+                  <span className="text-xs text-white/45">By unique problems solved (AC)</span>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
-                  {[
-                    { label: 'Total Solved', ...mockStats.interviewPractice.total },
-                    { label: 'Easy Solved', ...mockStats.interviewPractice.easy },
-                    { label: 'Medium Solved', ...mockStats.interviewPractice.medium },
-                    { label: 'Hard Solved', ...mockStats.interviewPractice.hard },
-                  ].map((stat) => {
-                    const percentage = getPercentage(stat.solved, stat.total);
-                    return (
-                      <div key={stat.label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
-                        <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: `conic-gradient(#22c55e ${percentage * 3.6}deg, #3a3a3a 0deg)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: '#2a2a2a', display: 'grid', placeItems: 'center', fontSize: '1rem', fontWeight: 'bold' }}>
-                            {percentage}%
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[480px] border-collapse text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-white/10 text-white/55">
+                        <th className="py-2 pr-3 font-medium">#</th>
+                        <th className="py-2 pr-3 font-medium">User</th>
+                        <th className="py-2 pr-3 font-medium">Solved</th>
+                        <th className="py-2 pr-3 font-medium">AC subs</th>
+                        <th className="py-2 font-medium">Score</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.globalLeaderboard.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="py-8 text-center text-white/50">
+                            No accepted submissions yet. Be the first on the board.
+                          </td>
+                        </tr>
+                      ) : (
+                        data.globalLeaderboard.map((row) => (
+                          <tr
+                            key={row.userId}
+                            className={
+                              meId && row.userId === meId
+                                ? 'border-b border-white/5 bg-green-500/10'
+                                : 'border-b border-white/5 hover:bg-white/[0.03]'
+                            }
+                          >
+                            <td className="py-2.5 pr-3 font-mono text-white/80">{row.rank}</td>
+                            <td className="py-2.5 pr-3 font-medium text-white">{row.username}</td>
+                            <td className="py-2.5 pr-3 text-green-400">{row.uniqueSolved}</td>
+                            <td className="py-2.5 pr-3 text-white/60">{row.acceptedSubmissions}</td>
+                            <td className="py-2.5 text-white/60">{row.scoreSum}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-[#3a3a3a] bg-[#2a2a2a] p-4 sm:p-5">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span aria-hidden>☰</span>
+                    <h2 className="text-base font-semibold">Activity</h2>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-[#9ca3af]">
+                    <span>
+                      {data.me ? `${data.me.contributions.totalSubmissions} submissions in` : 'Sign in to track'}{' '}
+                    </span>
+                    <span aria-hidden>🔥</span>
+                    <label htmlFor="lb-year" className="sr-only">
+                      Year
+                    </label>
+                    <select
+                      id="lb-year"
+                      value={year}
+                      onChange={(e) => setYear(parseInt(e.target.value, 10))}
+                      disabled={loading}
+                      className="rounded border border-[#3a3a3a] bg-[#1a1a1a] px-2 py-1 text-sm text-white"
+                    >
+                      {YEAR_OPTIONS.map((y) => (
+                        <option key={y} value={y}>
+                          {y}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                {!data.me ? (
+                  <p className="text-sm text-white/50">Log in to see your submission heatmap for {year}.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <div className="flex gap-0.5">
+                      <div className="mr-2 flex flex-col gap-0.5">
+                        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                          <div key={day} className="h-3 w-3 text-[0.65rem] leading-3 text-[#9ca3af]">
+                            {day === 'Sun' || day === 'Wed' || day === 'Fri' ? day[0] : ''}
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex flex-wrap gap-0.5" style={{ maxWidth: 'calc(100% - 2rem)' }}>
+                        {weekKeys.map((weekKey) => {
+                          const weekContribs = weeks[weekKey];
+                          return weekContribs.map((contrib, dayIndex) => (
+                            <div
+                              key={`${weekKey}-${dayIndex}`}
+                              className="h-3 w-3 rounded-sm border border-[#161b22]"
+                              style={{ background: getContributionLevel(contrib.count) }}
+                              title={`${contrib.count} submission(s) on ${contrib.date}`}
+                            />
+                          ));
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {practice && data.me ? (
+                <div className="rounded-lg border border-[#3a3a3a] bg-[#2a2a2a] p-4 sm:p-5">
+                  <div className="mb-4 flex items-center gap-2">
+                    <span aria-hidden>🔗</span>
+                    <h2 className="text-base font-semibold">Practice by difficulty</h2>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+                    {statRings.map((stat) => {
+                      const percentage = getPercentage(stat.solved, stat.total);
+                      return (
+                        <div key={stat.label} className="flex flex-col items-center gap-2">
+                          <div
+                            className="flex h-20 w-20 items-center justify-center rounded-full"
+                            style={{
+                              background: `conic-gradient(#22c55e ${percentage * 3.6}deg, #3a3a3a 0deg)`,
+                            }}
+                          >
+                            <div className="flex h-[60px] w-[60px] items-center justify-center rounded-full bg-[#2a2a2a] text-sm font-bold">
+                              {percentage}%
+                            </div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-xs text-[#9ca3af]">{stat.label}</div>
+                            <div className="text-xs text-[#6b7280]">
+                              {stat.solved} / {stat.total}
+                            </div>
                           </div>
                         </div>
-                        <div style={{ textAlign: 'center' }}>
-                          <div style={{ fontSize: '0.875rem', color: '#9ca3af' }}>{stat.label}</div>
-                          <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>{stat.solved} / {stat.total}</div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+                      );
+                    })}
+                  </div>
 
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-                  <span>📊</span>
-                  <h3 style={{ fontSize: '1rem', fontWeight: '600', margin: 0 }}>Course Watch Time</h3>
-                </div>
-                <div style={{ fontSize: '0.875rem', color: '#9ca3af', marginBottom: '1rem' }}>(Time Invested In Upskilling Yourself)</div>
-                <div style={{ height: '150px', background: '#1a1a1a', borderRadius: '6px', padding: '1rem', position: 'relative', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: '2rem' }}>
-                  {mockStats.courseWatchTime.map((item) => (
-                    <div key={item.course} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', flex: 1 }}>
-                      <div style={{ width: '100%', height: `${(item.time / 0.1) * 100}%`, background: '#22c55e', borderRadius: '4px 4px 0 0', minHeight: '20px' }} />
-                      <div style={{ fontSize: '0.75rem', color: '#9ca3af', textAlign: 'center' }}>{item.course}</div>
+                  {watch.length > 0 ? (
+                    <div className="mt-8">
+                      <div className="mb-3 flex items-center gap-2">
+                        <span aria-hidden>📊</span>
+                        <h3 className="text-base font-semibold">Course watch time</h3>
+                      </div>
+                      <p className="mb-3 text-xs text-[#9ca3af]">Time invested in courses (hours)</p>
+                      <div className="flex h-40 items-end justify-center gap-8 rounded-md bg-[#1a1a1a] p-4">
+                        {watch.map((item) => (
+                          <div key={item.course} className="flex flex-1 flex-col items-center gap-2">
+                            <div
+                              className="w-full min-h-[20px] rounded-t bg-green-500 transition-all"
+                              style={{ height: `${Math.max(8, (item.hours / maxWatch) * 100)}%` }}
+                            />
+                            <div className="text-center text-xs text-[#9ca3af]">{item.course}</div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  ))}
+                  ) : null}
                 </div>
-              </div>
+              ) : null}
             </div>
           </div>
-        </div>
+        ) : null}
+
+        {loading && data ? <p className="mt-4 text-xs text-white/40">Refreshing…</p> : null}
       </div>
     </DashboardShell>
   );

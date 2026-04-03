@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import { leaderboardController } from '../controllers/leaderboardController';
-import { authenticate } from '../middleware/auth';
+import { authenticate, optionalAuthenticate } from '../middleware/auth';
 
 export const leaderboardRoutes = Router();
+
+leaderboardRoutes.get('/overview', optionalAuthenticate, leaderboardController.getOverview);
 
 leaderboardRoutes.use(authenticate);
 
