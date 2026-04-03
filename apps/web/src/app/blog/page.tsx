@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { AppNavbar } from '@/components/AppNavbar';
 import styles from './blog.module.css';
 
 export const metadata: Metadata = {
@@ -40,6 +41,7 @@ const workExperiences = [
 export default function BlogPage() {
   return (
     <div className={styles.page}>
+      <AppNavbar className="sticky top-0 z-50 shrink-0" />
       <header className={styles.topStrip}>
         <div className={styles.maxWrap}>
           <p>Explore the coolest frontend learning platform !</p>
