@@ -26,8 +26,14 @@ async function request<T>(
   });
 
   if (!response.ok) {
-    const error: ApiError = await response.json();
-    throw new Error(error.error || 'An error occurred');
+    let message = 'An error occurred';
+    try {
+      const errBody = (await response.json()) as ApiError & { message?: string };
+      message = errBody.error || errBody.message || message;
+    } catch {
+      message = `${response.status} ${response.statusText}`;
+    }
+    throw new Error(message);
   }
 
   return response.json();

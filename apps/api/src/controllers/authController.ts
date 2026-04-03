@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '@codeforces/db';
 import { generateToken, generateOTP, getOTPExpiry, isOTPExpired } from '@codeforces/auth';
-import { sendOTPEmail } from '../services/emailService';
+import { getEmailDeliveryMode, sendOTPEmail } from '../services/emailService';
 
 const requestOTPSchema = z.object({
   email: z.string().email(),
@@ -38,12 +38,20 @@ export const authController = {
         },
       });
 
-      // Send OTP via email
+      // Send OTP via email (or dev console fallback when SMTP is not configured)
       await sendOTPEmail(email, otp);
 
+      const deliveryMode = getEmailDeliveryMode();
       res.json({
-        message: 'OTP sent to your email',
+        message:
+          deliveryMode === 'smtp'
+            ? 'OTP sent to your email'
+            : 'OTP ready (email not configured — use dev-only channel)',
         expiresIn: 600, // 10 minutes in seconds
+        ...(process.env.NODE_ENV !== 'production' && {
+          deliveryMode,
+          ...(deliveryMode === 'console' ? { devOtp: otp } : {}),
+        }),
       });
     } catch (error) {
       if (error instanceof z.ZodError) {

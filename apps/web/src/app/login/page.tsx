@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
-import { setToken, setUser } from '@/lib/auth';
+import { setToken, setUser, type User } from '@/lib/auth';
 import { Navbar } from '@/components/Navbar';
 
 export default function LoginPage() {
@@ -15,16 +15,31 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  /** Set only in development when API has no SMTP (never present in production responses). */
+  const [devOtp, setDevOtp] = useState<string | null>(null);
 
   const handleRequestOTP = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setMessage('');
+    setDevOtp(null);
     setLoading(true);
 
     try {
-      await api.post('/auth/request-otp', { email });
-      setMessage('OTP sent to your email! Check your inbox.');
+      const response = await api.post<{
+        deliveryMode?: 'smtp' | 'console';
+        devOtp?: string;
+      }>('/auth/request-otp', {
+        email,
+      });
+      if (response.deliveryMode === 'console') {
+        setMessage(
+          'Email is not configured on the server. Use the one-time code below (development only) or add SMTP_* to apps/api/.env.',
+        );
+        if (response.devOtp) setDevOtp(response.devOtp);
+      } else {
+        setMessage('OTP sent to your email! Check your inbox/spam folder.');
+      }
       setStep('otp');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send OTP');
@@ -39,14 +54,14 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const response = await api.post<{ user: unknown; token: string }>('/auth/verify-otp', {
+      const response = await api.post<{ user: User; token: string }>('/auth/verify-otp', {
         email,
         code: otp,
         username: username || undefined,
       });
 
       setToken(response.token);
-      setUser(response.user as { id: string; email: string; username: string; role: string });
+      setUser(response.user);
       router.push('/contests');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Invalid OTP');
@@ -62,6 +77,24 @@ export default function LoginPage() {
         <h1>Login with OTP</h1>
         {error && <div style={{ color: 'red', marginTop: '1rem' }}>{error}</div>}
         {message && <div style={{ color: 'green', marginTop: '1rem' }}>{message}</div>}
+        {devOtp && (
+          <div
+            role="status"
+            style={{
+              marginTop: '1rem',
+              padding: '1rem',
+              borderRadius: '8px',
+              background: '#fef3c7',
+              color: '#92400e',
+              fontFamily: 'monospace',
+              fontSize: '1.25rem',
+              letterSpacing: '0.2em',
+              textAlign: 'center',
+            }}
+          >
+            Dev OTP: {devOtp}
+          </div>
+        )}
 
         {step === 'email' ? (
           <form onSubmit={handleRequestOTP} style={{ marginTop: '2rem' }}>
@@ -121,6 +154,7 @@ export default function LoginPage() {
                   setOtp('');
                   setError('');
                   setMessage('');
+                  setDevOtp(null);
                 }}
               >
                 Back

@@ -1,3 +1,4 @@
+import path from 'node:path';
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -9,8 +10,18 @@ import { submissionRoutes } from './routes/submissions';
 import { leaderboardRoutes } from './routes/leaderboard';
 import { executionRoutes } from './routes/execution';
 import { connectRedis, disconnectRedis } from './services/redisService';
+import {
+  assertEmailConfigForRuntime,
+  getEmailDeliveryMode,
+  verifySmtpIfConfigured,
+} from './services/emailService';
 
-dotenv.config();
+// Load env from known locations (Turbo/cwd may not be apps/api).
+const apiDir = path.resolve(__dirname, '..');
+dotenv.config({ path: path.resolve(apiDir, '../../.env') });
+dotenv.config({ path: path.join(apiDir, '.env'), override: true });
+
+assertEmailConfigForRuntime();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -45,5 +56,15 @@ process.on('SIGTERM', async () => {
 
 app.listen(PORT, () => {
   console.log(`🚀 API server running on http://localhost:${PORT}`);
+  const mode = getEmailDeliveryMode();
+  console.log(`📬 Email delivery mode: ${mode}`);
+  if (mode === 'console' && process.env.NODE_ENV !== 'production') {
+    console.log(
+      '⚠️  SMTP_USER / SMTP_PASS not set — OTP is NOT emailed. Set SMTP_* in apps/api/.env (or root .env), or use devOtp from /auth/request-otp in dev.',
+    );
+  }
+  verifySmtpIfConfigured().catch((err: Error) => {
+    console.error('[MAIL] SMTP verify failed — outgoing mail may not work:', err.message);
+  });
 });
 

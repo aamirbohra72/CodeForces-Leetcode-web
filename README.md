@@ -56,12 +56,26 @@ DATABASE_URL="postgresql://user:password@localhost:5432/codeforces?schema=public
 JWT_SECRET="your-secret-key-change-in-production"
 JWT_EXPIRES_IN="7d"
 NODE_ENV="development"
+SMTP_HOST="smtp.gmail.com"
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER="your-email@gmail.com"
+SMTP_PASS="your-app-password"
+SMTP_FROM="Codeforces <noreply@yourdomain.com>"
 ```
 
 **`apps/web/.env.local`:**
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:3001/api
 ```
+
+### OTP Email Delivery (Production Ready)
+
+- In `production`, SMTP is mandatory. API startup fails fast if SMTP is missing.
+- In `development`, if SMTP is not configured, OTP is logged to API console as `[DEV OTP]`.
+- For Gmail, use an **App Password** (not account password), and prefer `SMTP_PORT=587` + `SMTP_SECURE=false`.
+- If your provider uses SSL on 465, set `SMTP_PORT=465` and `SMTP_SECURE=true`.
+- Ensure `SMTP_FROM` uses a verified sender/domain for your provider.
 
 **Note:** The seed script will look for `DATABASE_URL` in both the root `.env` and `apps/api/.env` files.
 
