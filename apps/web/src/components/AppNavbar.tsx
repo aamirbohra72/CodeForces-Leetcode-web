@@ -27,6 +27,7 @@ const PRIMARY_LINKS = [
   { href: '/projects', label: 'Projects' },
   { href: '/blog', label: 'Blog' },
   { href: '/billing', label: 'Billing' },
+  { href: '/affiliate', label: 'Affiliate' },
 ] as const;
 
 /** Match route segment: exact for leaderboard, prefix for nested routes. */
@@ -35,7 +36,13 @@ function linkIsActive(pathname: string, href: string, override?: string) {
     return override === href || (href !== '/' && override.startsWith(href));
   }
   if (pathname === href) return true;
-  if (href === '/leaderboard' || href === '/blog' || href === '/projects' || href === '/billing') {
+  if (
+    href === '/leaderboard' ||
+    href === '/blog' ||
+    href === '/projects' ||
+    href === '/billing' ||
+    href === '/affiliate'
+  ) {
     return pathname === href;
   }
   return pathname.startsWith(`${href}/`);

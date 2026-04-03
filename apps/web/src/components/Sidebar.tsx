@@ -18,6 +18,7 @@ const sidebarItems: SidebarItem[] = [
   { label: 'Courses', href: '/learn', icon: '📚' },
   { label: 'Blog', href: '/blog', icon: '✍️' },
   { label: 'Gift a course', href: '/gift', icon: '🎁' },
+  { label: 'Become Affiliate', href: '/affiliate', icon: '💵' },
   { label: 'Certificates', href: '/certificates', icon: '🏆' },
   { label: 'Billing', href: '/billing', icon: '💳' },
   { label: 'Playground', href: '/practice', icon: '💻' },
