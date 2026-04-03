@@ -39,6 +39,7 @@ export function Navbar() {
           <Link href="/practice">Practice</Link>
           <Link href="/learn">Courses</Link>
           <Link href="/contests">Contests</Link>
+          <Link href="/leaderboard">Leaderboard</Link>
           {user ? (
             <>
               {isAdminUser && <Link href="/admin/dashboard">Admin</Link>}
