@@ -2,6 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect } from 'react';
+import { useOptionalDashboardSidebar } from '@/contexts/DashboardSidebarContext';
+import { cn } from '@/lib/cn';
 
 interface SidebarItem {
   label: string;
@@ -26,23 +29,30 @@ const sidebarItems: SidebarItem[] = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const ctx = useOptionalDashboardSidebar();
+  const isOpen = ctx?.isOpen ?? true;
+  const isMobile = ctx?.isMobile ?? false;
+  const sidebarId = ctx?.sidebarId ?? 'sidebar-panel-static';
+  const setOpen = ctx?.setOpen;
+
+  useEffect(() => {
+    if (!isMobile || !setOpen) return;
+    setOpen(false);
+  }, [pathname, isMobile, setOpen]);
+
+  const panelOpen = ctx ? isOpen : true;
 
   return (
     <aside
-      style={{
-        width: '240px',
-        background: '#2a2a2a',
-        color: 'white',
-        height: 'calc(100vh - 60px)',
-        position: 'fixed',
-        left: 0,
-        top: '60px',
-        overflowY: 'auto',
-        padding: '1.5rem 0',
-        borderRight: '1px solid #3a3a3a',
-      }}
+      id={sidebarId}
+      aria-hidden={!panelOpen}
+      className={cn(
+        'fixed left-0 z-40 w-[240px] overflow-y-auto border-r border-[#3a3a3a] bg-[#2a2a2a] py-6 text-white transition-transform duration-200 ease-out',
+        'top-14 h-[calc(100vh-3.5rem)]',
+        panelOpen ? 'translate-x-0' : '-translate-x-full pointer-events-none',
+      )}
     >
-      <nav>
+      <nav aria-label="Dashboard">
         {sidebarItems.map((item) => {
           const isActive =
             item.href === '/'
@@ -52,6 +62,7 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              tabIndex={panelOpen ? undefined : -1}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -100,5 +111,3 @@ export function Sidebar() {
     </aside>
   );
 }
-
-

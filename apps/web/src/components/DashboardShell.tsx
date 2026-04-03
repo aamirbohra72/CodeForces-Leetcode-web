@@ -3,6 +3,8 @@
 import type { ReactNode } from 'react';
 import { AppNavbar } from '@/components/AppNavbar';
 import { Sidebar } from '@/components/Sidebar';
+import { SidebarBackdrop } from '@/components/SidebarBackdrop';
+import { DashboardSidebarProvider, useDashboardSidebar } from '@/contexts/DashboardSidebarContext';
 import { cn } from '@/lib/cn';
 
 export type DashboardShellProps = {
@@ -13,25 +15,36 @@ export type DashboardShellProps = {
   navClassName?: string;
 };
 
+function DashboardShellMain({ children, mainClassName }: Pick<DashboardShellProps, 'children' | 'mainClassName'>) {
+  const { isOpen, isMobile } = useDashboardSidebar();
+  const showOffset = isOpen && !isMobile;
+
+  return (
+    <main
+      className={cn(
+        'min-h-[calc(100vh-3.5rem)] flex-1 bg-[#1a1a1a] text-white antialiased transition-[margin] duration-200 ease-out',
+        showOffset && 'ml-[240px]',
+        mainClassName,
+      )}
+    >
+      {children}
+    </main>
+  );
+}
+
 /**
  * Shared layout: dark AppNavbar + fixed sidebar + main content area.
  * Matches the `/learn` dashboard chrome (theme from product screenshots).
  */
 export function DashboardShell({ children, mainClassName, navClassName }: DashboardShellProps) {
   return (
-    <>
-      <AppNavbar className={cn('shrink-0', navClassName)} />
-      <div className="flex w-full min-h-[calc(100vh-3.5rem)]">
+    <DashboardSidebarProvider>
+      <AppNavbar className={cn('sticky top-0 z-50 shrink-0', navClassName)} />
+      <div className="relative flex w-full min-h-[calc(100vh-3.5rem)]">
+        <SidebarBackdrop />
         <Sidebar />
-        <main
-          className={cn(
-            'ml-[240px] min-h-[calc(100vh-3.5rem)] flex-1 bg-[#1a1a1a] text-white antialiased',
-            mainClassName,
-          )}
-        >
-          {children}
-        </main>
+        <DashboardShellMain mainClassName={mainClassName}>{children}</DashboardShellMain>
       </div>
-    </>
+    </DashboardSidebarProvider>
   );
 }
