@@ -47,6 +47,33 @@ NODE_ENV="development"
 NEXT_PUBLIC_API_URL=http://localhost:3001/api
 ```
 
+Use one consistent `JWT_SECRET` everywhere the API loads env from (root `.env` vs `apps/api/.env`). Changing it invalidates existing tokens — users must log in again. The web app must call the same API that issued the token (`NEXT_PUBLIC_API_URL`).
+
+**Interview chatbot (optional):** The `/interview` flow uses **Mistral** from the API for transcription (Voxtral) and chat scoring. Set on the **API** only (never `NEXT_PUBLIC_*`):
+
+```env
+MISTRAL_API_KEY="your-mistral-api-key"
+# optional overrides:
+# MISTRAL_CHAT_MODEL=mistral-small-latest
+# MISTRAL_TRANSCRIBE_MODEL=voxtral-mini-latest
+```
+
+In **production**, enable the routes explicitly:
+
+```env
+INTERVIEW_ENABLED=true
+```
+
+If `INTERVIEW_ENABLED` is not `true` in production, `/api/interview/*` returns 503. Development does not require `INTERVIEW_ENABLED`.
+
+**Interview DB tables:** If `POST /api/interview/sessions` returns **500** (or **503** with “missing tables”), apply the schema to Postgres:
+
+```bash
+npm run db:push
+```
+
+Use the same `DATABASE_URL` as the API (`apps/api/.env` or root `.env`). If `npm run db:migrate` fails on a shadow database error, `db:push` is fine for local dev to add `InterviewSession` / `InterviewTurn`.
+
 **Option 2: Separate files:**
 
 **`apps/api/.env`:**
@@ -85,7 +112,7 @@ NEXT_PUBLIC_API_URL=http://localhost:3001/api
 # Generate Prisma client
 npm run db:generate
 
-# Run migrations
+# Run migrations (applies InterviewSession / InterviewTurn when present)
 npm run db:migrate
 
 # Seed the database

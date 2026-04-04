@@ -22,6 +22,7 @@ const sidebarItems: SidebarItem[] = [
   { label: 'Certificates', href: '/certificates', icon: '🏆' },
   { label: 'Billing', href: '/billing', icon: '💳' },
   { label: 'Playground', href: '/practice', icon: '💻' },
+  { label: 'Interview (JS)', href: '/interview', icon: '🎙️' },
   { label: 'Write a Blog', href: '/blog/write', icon: '✏️' },
   { label: 'DSA Sheet', href: '/dsa-sheet', icon: '📋' },
   { label: 'Roadmaps', href: '/roadmaps', icon: '🗺️' },

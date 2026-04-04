@@ -30,6 +30,18 @@ enum SubmissionStatus {
     COMPILATION_ERROR
 }
 
+enum InterviewSessionStatus {
+    IN_PROGRESS
+    COMPLETED
+    ABANDONED
+}
+
+enum InterviewVerdict {
+    SELECT
+    REJECT
+    BORDERLINE
+}
+
 model User {
     id        String   @id @default(cuid())
     email     String   @unique
@@ -40,6 +52,7 @@ model User {
 
     submissions        Submission[]
     leaderboardEntries LeaderboardEntry[]
+    interviewSessions  InterviewSession[]
 
     @@index([email])
     @@index([username])
@@ -132,4 +145,42 @@ model Submission {
     @@index([status])
     @@index([submittedAt])
     @@index([score])
+}
+
+model InterviewSession {
+    id               String                 @id @default(cuid())
+    userId           String
+    template         String
+    status           InterviewSessionStatus   @default(IN_PROGRESS)
+    startedAt        DateTime               @default(now())
+    endsAt           DateTime
+    currentQuestion  Int                    @default(0)
+    verdict          InterviewVerdict?
+    overallScore     Int?
+    summaryJson      String?
+    reportDetail     String?
+    createdAt        DateTime               @default(now())
+    updatedAt        DateTime               @updatedAt
+
+    user  User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+    turns InterviewTurn[]
+
+    @@index([userId])
+    @@index([status])
+}
+
+model InterviewTurn {
+    id           String   @id @default(cuid())
+    sessionId    String
+    order        Int
+    questionText String
+    transcript   String
+    score        Int      @default(0)
+    llmFeedback  String?
+    createdAt    DateTime @default(now())
+
+    session InterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+    @@unique([sessionId, order])
+    @@index([sessionId])
 }

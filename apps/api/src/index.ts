@@ -9,6 +9,7 @@ import { challengeRoutes } from './routes/challenges';
 import { submissionRoutes } from './routes/submissions';
 import { leaderboardRoutes } from './routes/leaderboard';
 import { executionRoutes } from './routes/execution';
+import { interviewRoutes } from './routes/interview';
 import { connectRedis, disconnectRedis } from './services/redisService';
 import {
   assertEmailConfigForRuntime,
@@ -36,6 +37,7 @@ app.use('/api/challenges', challengeRoutes);
 app.use('/api/submissions', submissionRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/execute', executionRoutes);
+app.use('/api/interview', interviewRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

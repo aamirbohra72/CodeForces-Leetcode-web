@@ -40,8 +40,7 @@ yarn-error.log*
 # Turbo
 .turbo
 
-# Prisma
-packages/db/prisma/migrations/
+# Prisma (keep migrations in git so `InterviewSession` and other tables apply everywhere)
 
 # IDE
 .vscode/
