@@ -9,7 +9,7 @@ import { Sidebar } from '@/components/Sidebar';
 // Mock course data - in production, fetch from API
 const courseData: Record<string, any> = {
   '1': {
-    title: 'Namaste DSA',
+    title: 'Salaam DSA',
     description: 'Master Data Structures and Algorithms with hands-on coding, clear explanations, and real-world problem-solving.',
     rating: 4.9,
     reviews: 1000,
@@ -25,7 +25,7 @@ const courseData: Record<string, any> = {
     ],
   },
   '2': {
-    title: 'Namaste Node.js',
+    title: 'Salaam Node.js',
     description: 'From basics to advanced concepts, gain experience in building applications with Node.js.',
     rating: 4.8,
     reviews: 2000,

@@ -59,7 +59,7 @@ const PROJECTS: Project[] = [
     shortDesc: 'A MERN full-stack platform where users exchange skills in a barter-like system.',
     domains: ['Edtech', 'Productivity'],
     technologies: ['Web', 'React', 'Nodejs', 'Fullstack'],
-    author: 'NamasteDev',
+    author: 'SalaamDev',
     likes: 33,
     overviewParagraphs: [
       'A MERN full-stack platform where users exchange skills in a barter-like system.',
@@ -242,7 +242,7 @@ const PROJECTS: Project[] = [
     shortDesc: 'Browser extension that remembers carts and helps checkout faster across stores.',
     domains: ['Productivity', 'E-commerce'],
     technologies: ['Chrome Extension', 'JavaScript', 'Web'],
-    author: 'NamasteDev',
+    author: 'SalaamDev',
     likes: 18,
     detailBlocks: [
       {
@@ -262,7 +262,7 @@ const PROJECTS: Project[] = [
     shortDesc: 'Compare nightly rates across hotel and short-stay sites in one glance.',
     domains: ['Travel', 'Productivity'],
     technologies: ['Chrome Extension', 'React', 'Nodejs'],
-    author: 'NamasteDev',
+    author: 'SalaamDev',
     likes: 24,
     detailBlocks: [
       {
@@ -282,7 +282,7 @@ const PROJECTS: Project[] = [
     shortDesc: 'Real-time scoring, player props, and league insights for fantasy managers.',
     domains: ['Sports', 'Gaming'],
     technologies: ['React', 'Nodejs', 'WebSocket', 'Postgres'],
-    author: 'NamasteDev',
+    author: 'SalaamDev',
     likes: 41,
     overviewParagraphs: [
       'Aggregate feeds from public APIs, normalize stats, and surface **start/sit** recommendations.',
@@ -310,7 +310,7 @@ const PROJECTS: Project[] = [
     shortDesc: 'Place 3D furniture in your room using mobile AR and save layouts.',
     domains: ['Interior', 'Mobile'],
     technologies: ['React Native', 'ARCore', 'Three.js'],
-    author: 'NamasteDev',
+    author: 'SalaamDev',
     likes: 56,
     detailBlocks: [
       {
@@ -330,7 +330,7 @@ const PROJECTS: Project[] = [
     shortDesc: 'Track time, generate expense reports, and email branded PDF invoices.',
     domains: ['Productivity', 'Finance'],
     technologies: ['Next.js', 'Prisma', 'Stripe'],
-    author: 'NamasteDev',
+    author: 'SalaamDev',
     likes: 29,
     detailBlocks: [
       {
@@ -350,7 +350,7 @@ const PROJECTS: Project[] = [
     shortDesc: 'Share recipes, nutritional estimates, and pantry substitutions with moderation.',
     domains: ['Community', 'Health'],
     technologies: ['React', 'Express', 'MongoDB'],
-    author: 'NamasteDev',
+    author: 'SalaamDev',
     likes: 12,
     detailBlocks: [
       {

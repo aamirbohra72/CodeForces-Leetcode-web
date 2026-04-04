@@ -39,7 +39,7 @@ const mockStats = {
   courseWatchTime: {
     public: true,
     data: [
-      { course: 'Namaste React', time: 0.068 },
+      { course: 'Salaam React', time: 0.068 },
     ],
   },
 };

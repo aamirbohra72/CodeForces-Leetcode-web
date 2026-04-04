@@ -20,7 +20,7 @@ interface Course {
 const mockCourses: Course[] = [
   {
     id: '1',
-    title: 'Namaste DSA',
+    title: 'Salaam DSA',
     description: 'Master Data Structures and Algorithms with hands-on coding, clear explanations, and real-world problem-solving.',
     rating: 4.9,
     reviews: 1000,
@@ -30,7 +30,7 @@ const mockCourses: Course[] = [
   },
   {
     id: '2',
-    title: 'Namaste Node.js',
+    title: 'Salaam Node.js',
     description: 'From basics to advanced concepts, gain experience in building applications with Node.js.',
     rating: 4.8,
     reviews: 2000,
@@ -40,7 +40,7 @@ const mockCourses: Course[] = [
   },
   {
     id: '3',
-    title: 'Namaste React',
+    title: 'Salaam React',
     description: 'Learn React from scratch and build modern web applications with hooks, context, and more.',
     rating: 4.9,
     reviews: 1500,

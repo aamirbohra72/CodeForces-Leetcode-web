@@ -18,21 +18,21 @@ interface Course {
 const mockCourses: Course[] = [
   {
     id: '1',
-    title: 'Namaste DSA',
-    description: 'Master Data Structures and Algorithms with Namaste DSA hands-on coding, clear explanations, and real-world problem-solving.',
+    title: 'Salaam DSA',
+    description: 'Master Data Structures and Algorithms with Salaam DSA hands-on coding, clear explanations, and real-world problem-solving.',
     language: 'English',
     validity: 'Lifetime',
   },
   {
     id: '2',
-    title: 'Namaste Node.js',
+    title: 'Salaam Node.js',
     description: 'From basics to advanced concepts, gain experience in building applications.',
     language: 'English',
     validity: 'Lifetime',
   },
   {
     id: '3',
-    title: 'Namaste React',
+    title: 'Salaam React',
     description: 'Learn React from scratch and build modern web applications with hooks, context, and more.',
     language: 'English',
     validity: 'Lifetime',

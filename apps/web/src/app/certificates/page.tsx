@@ -12,11 +12,11 @@ interface CertificateCourse {
 
 // Mock certificate courses data - in production, this would come from your API
 const certificateCourses: CertificateCourse[] = [
-  { id: '1', title: 'Namaste DSA', status: 'enroll' },
-  { id: '2', title: 'Namaste Node.js', status: 'enroll' },
-  { id: '3', title: 'Namaste Frontend System Design', status: 'enroll' },
-  { id: '4', title: 'Namaste React', status: 'enroll' },
-  { id: '5', title: 'Namaste JavaScript', status: 'complete' }, // This one shows "Complete The Course"
+  { id: '1', title: 'Salaam DSA', status: 'enroll' },
+  { id: '2', title: 'Salaam Node.js', status: 'enroll' },
+  { id: '3', title: 'Salaam Frontend System Design', status: 'enroll' },
+  { id: '4', title: 'Salaam React', status: 'enroll' },
+  { id: '5', title: 'Salaam JavaScript', status: 'complete' }, // This one shows "Complete The Course"
   { id: '6', title: 'Crack Frontend Interview', status: 'enroll' },
   { id: '7', title: 'Masterclasses', status: 'enroll' },
 ];
