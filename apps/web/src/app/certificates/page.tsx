@@ -1,40 +1,51 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Navbar } from '@/components/Navbar';
-import { Sidebar } from '@/components/Sidebar';
+import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { DashboardShell } from '@/components/DashboardShell';
+import { downloadCertificatePdf } from '@/components/certificates/downloadCertificatePdf';
+import { getUser } from '@/lib/auth';
+import {
+  type CertificateStatus,
+  resolveCertificateCourses,
+} from '@/lib/certificates';
 
-interface CertificateCourse {
-  id: string;
-  title: string;
-  status: 'enroll' | 'complete'; // 'enroll' means show "Enroll Now", 'complete' means show "Complete The Course"
+type CourseRow = ReturnType<typeof resolveCertificateCourses>[number];
+
+function actionLabel(status: CertificateStatus): string {
+  if (status === 'eligible') return 'Generate Certificate';
+  if (status === 'in_progress') return 'Complete The Course';
+  return 'Enroll Now';
 }
 
-// Mock certificate courses data - in production, this would come from your API
-const certificateCourses: CertificateCourse[] = [
-  { id: '1', title: 'Salaam DSA', status: 'enroll' },
-  { id: '2', title: 'Salaam Node.js', status: 'enroll' },
-  { id: '3', title: 'Salaam Frontend System Design', status: 'enroll' },
-  { id: '4', title: 'Salaam React', status: 'enroll' },
-  { id: '5', title: 'Salaam JavaScript', status: 'complete' }, // This one shows "Complete The Course"
-  { id: '6', title: 'Crack Frontend Interview', status: 'enroll' },
-  { id: '7', title: 'Masterclasses', status: 'enroll' },
-];
+function buttonColors(status: CertificateStatus): { bg: string; hover: string } {
+  if (status === 'eligible') return { bg: '#16a34a', hover: '#15803d' };
+  if (status === 'in_progress') return { bg: '#3b82f6', hover: '#2563eb' };
+  return { bg: '#1e3a8a', hover: '#1e40af' };
+}
 
 export default function CertificatesPage() {
+  const router = useRouter();
   const [isModalOpen, setIsModalOpen] = useState(true);
+  const [courses, setCourses] = useState<CourseRow[]>([]);
+  const [generatingId, setGeneratingId] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
-  // Close modal when clicking outside
+  const refreshCourses = useCallback(() => {
+    setCourses(resolveCertificateCourses());
+  }, []);
+
+  useEffect(() => {
+    refreshCourses();
+  }, [refreshCourses]);
+
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setIsModalOpen(false);
-      }
+      if (e.key === 'Escape') setIsModalOpen(false);
     };
 
     if (isModalOpen) {
       document.addEventListener('keydown', handleEscape);
-      // Prevent body scroll when modal is open
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = 'unset';
@@ -46,238 +57,304 @@ export default function CertificatesPage() {
     };
   }, [isModalOpen]);
 
-  const handleEnroll = (courseId: string) => {
-    // In production, this would navigate to the course or handle enrollment
-    console.log('Enroll in course:', courseId);
-    // You can add navigation logic here, e.g.:
-    // router.push(`/learn/${courseId}`);
-  };
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 2800);
+    return () => clearTimeout(t);
+  }, [toast]);
 
-  const handleComplete = (courseId: string) => {
-    // In production, this would navigate to complete the course or claim certificate
-    console.log('Complete course:', courseId);
-    // You can add navigation logic here
+  const claimed = courses.filter((c) => c.status === 'eligible');
+
+  const handleAction = (course: CourseRow) => {
+    if (course.status === 'eligible') {
+      setGeneratingId(course.id);
+      try {
+        const user = getUser();
+        const recipientName = user?.username || user?.email?.split('@')[0] || 'Learner';
+        downloadCertificatePdf({
+          recipientName,
+          courseTitle: course.title,
+        });
+        setToast(`Downloaded certificate for ${course.title}`);
+      } catch {
+        setToast('Could not generate certificate. Please try again.');
+      } finally {
+        setGeneratingId(null);
+      }
+      return;
+    }
+
+    setIsModalOpen(false);
+    router.push(course.href);
   };
 
   return (
-    <>
-      <Navbar />
-      <div style={{ display: 'flex', minHeight: 'calc(100vh - 60px)' }}>
-        <Sidebar />
-        <main
+    <DashboardShell mainClassName="relative min-h-0 overflow-y-auto p-8">
+      <div>
+        <h1 style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>Certificates</h1>
+        <p style={{ color: '#9ca3af', marginBottom: '1.5rem' }}>
+          View and claim your course certificates
+        </p>
+
+        <button
+          type="button"
+          onClick={() => setIsModalOpen(true)}
           style={{
-            marginLeft: '240px',
-            flex: 1,
-            background: '#1a1a1a',
+            background: '#f97316',
             color: 'white',
-            padding: '2rem',
-            position: 'relative',
+            border: 'none',
+            padding: '0.75rem 1.5rem',
+            borderRadius: '6px',
+            fontSize: '1rem',
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = '#ea580c';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = '#f97316';
           }}
         >
-          {/* Page Content (visible when modal is closed) */}
-          {!isModalOpen && (
-            <div>
-              <h1 style={{ fontSize: '2rem', marginBottom: '1rem' }}>Certificates</h1>
-              <p style={{ color: '#9ca3af', marginBottom: '2rem' }}>
-                View and claim your course certificates
-              </p>
-              <button
-                onClick={() => setIsModalOpen(true)}
-                style={{
-                  background: '#f97316',
-                  color: 'white',
-                  border: 'none',
-                  padding: '0.75rem 1.5rem',
-                  borderRadius: '6px',
-                  fontSize: '1rem',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = '#ea580c';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = '#f97316';
-                }}
-              >
-                Claim Your Certificates
-              </button>
-            </div>
-          )}
+          Claim Your Certificates
+        </button>
 
-          {/* Modal Overlay */}
-          {isModalOpen && (
+        {claimed.length > 0 && (
+          <div style={{ marginTop: '2.5rem' }}>
+            <h2 style={{ fontSize: '1.25rem', marginBottom: '1rem', fontWeight: 600 }}>
+              Ready to download
+            </h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxWidth: 560 }}>
+              {claimed.map((course) => {
+                const colors = buttonColors('eligible');
+                return (
+                  <div
+                    key={course.id}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: '1rem',
+                      padding: '1rem',
+                      background: '#2a2a2a',
+                      borderRadius: 8,
+                      border: '1px solid #3a3a3a',
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 600 }}>{course.title}</div>
+                      <div style={{ fontSize: '0.8rem', color: '#9ca3af', marginTop: 4 }}>
+                        Course completed
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={generatingId === course.id}
+                      onClick={() => handleAction(course)}
+                      style={{
+                        padding: '0.5rem 1.25rem',
+                        borderRadius: 6,
+                        border: 'none',
+                        fontSize: '0.875rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        background: colors.bg,
+                        color: 'white',
+                        whiteSpace: 'nowrap',
+                        opacity: generatingId === course.id ? 0.7 : 1,
+                      }}
+                    >
+                      {generatingId === course.id ? 'Generating…' : 'Download PDF'}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {isModalOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.75)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '2rem',
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsModalOpen(false);
+          }}
+        >
+          <div
+            style={{
+              background: '#2a2a2a',
+              borderRadius: 12,
+              width: '100%',
+              maxWidth: 600,
+              maxHeight: '80vh',
+              overflowY: 'auto',
+              position: 'relative',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div
               style={{
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                background: 'rgba(0, 0, 0, 0.75)',
                 display: 'flex',
+                justifyContent: 'space-between',
                 alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 1000,
-                padding: '2rem',
-              }}
-              onClick={(e) => {
-                // Close modal when clicking on overlay (not on modal content)
-                if (e.target === e.currentTarget) {
-                  setIsModalOpen(false);
-                }
+                padding: '1.5rem',
+                borderBottom: '1px solid #3a3a3a',
+                position: 'sticky',
+                top: 0,
+                background: '#2a2a2a',
+                zIndex: 10,
               }}
             >
-              {/* Modal Content */}
-              <div
+              <h2
                 style={{
-                  background: '#2a2a2a',
-                  borderRadius: '12px',
-                  width: '100%',
-                  maxWidth: '600px',
-                  maxHeight: '80vh',
-                  overflowY: 'auto',
-                  position: 'relative',
-                  boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
+                  fontSize: '1.5rem',
+                  fontWeight: 'bold',
+                  color: 'white',
+                  margin: 0,
                 }}
-                onClick={(e) => e.stopPropagation()}
               >
-                {/* Modal Header */}
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '1.5rem',
-                    borderBottom: '1px solid #3a3a3a',
-                    position: 'sticky',
-                    top: 0,
-                    background: '#2a2a2a',
-                    zIndex: 10,
-                  }}
-                >
-                  <h2
-                    style={{
-                      fontSize: '1.5rem',
-                      fontWeight: 'bold',
-                      color: 'white',
-                      margin: 0,
-                    }}
-                  >
-                    Claim your certificates
-                  </h2>
-                  <button
-                    onClick={() => setIsModalOpen(false)}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: 'white',
-                      fontSize: '1.5rem',
-                      cursor: 'pointer',
-                      padding: '0.25rem 0.5rem',
-                      borderRadius: '4px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      transition: 'background 0.2s',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = '#3a3a3a';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'transparent';
-                    }}
-                    aria-label="Close modal"
-                  >
-                    ×
-                  </button>
-                </div>
+                Claim your certificates
+              </h2>
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'white',
+                  fontSize: '1.5rem',
+                  cursor: 'pointer',
+                  padding: '0.25rem 0.5rem',
+                  borderRadius: 4,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#3a3a3a';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent';
+                }}
+                aria-label="Close modal"
+              >
+                ×
+              </button>
+            </div>
 
-                {/* Modal Body - Course List */}
-                <div style={{ padding: '1.5rem' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    {certificateCourses.map((course) => (
-                      <div
-                        key={course.id}
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          padding: '1rem',
-                          background: '#1a1a1a',
-                          borderRadius: '8px',
-                          border: '1px solid #3a3a3a',
-                          transition: 'border-color 0.2s',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.borderColor = '#4a4a4a';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.borderColor = '#3a3a3a';
-                        }}
-                      >
+            <div style={{ padding: '1.5rem' }}>
+              <p style={{ color: '#9ca3af', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
+                Complete a course to unlock PDF certificate download. Finished courses show{' '}
+                <span style={{ color: '#86efac' }}>Generate Certificate</span>.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {courses.map((course) => {
+                  const colors = buttonColors(course.status);
+                  const busy = generatingId === course.id;
+                  return (
+                    <div
+                      key={course.id}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        gap: '1rem',
+                        padding: '1rem',
+                        background: '#1a1a1a',
+                        borderRadius: 8,
+                        border:
+                          course.status === 'eligible'
+                            ? '1px solid #166534'
+                            : '1px solid #3a3a3a',
+                        transition: 'border-color 0.2s',
+                      }}
+                    >
+                      <div style={{ minWidth: 0 }}>
                         <span
                           style={{
                             fontSize: '1rem',
                             color: 'white',
-                            fontWeight: '500',
+                            fontWeight: 500,
+                            display: 'block',
                           }}
                         >
                           {course.title}
                         </span>
-                        <button
-                          onClick={() => {
-                            if (course.status === 'complete') {
-                              handleComplete(course.id);
-                            } else {
-                              handleEnroll(course.id);
-                            }
-                          }}
-                          style={{
-                            padding: '0.5rem 1.25rem',
-                            borderRadius: '6px',
-                            border: 'none',
-                            fontSize: '0.875rem',
-                            fontWeight: '600',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
-                            ...(course.status === 'complete'
-                              ? {
-                                  background: '#3b82f6', // Bright blue for "Complete The Course"
-                                  color: 'white',
-                                }
-                              : {
-                                  background: '#1e3a8a', // Dark blue for "Enroll Now"
-                                  color: 'white',
-                                }),
-                          }}
-                          onMouseEnter={(e) => {
-                            if (course.status === 'complete') {
-                              e.currentTarget.style.background = '#2563eb';
-                            } else {
-                              e.currentTarget.style.background = '#1e40af';
-                            }
-                          }}
-                          onMouseLeave={(e) => {
-                            if (course.status === 'complete') {
-                              e.currentTarget.style.background = '#3b82f6';
-                            } else {
-                              e.currentTarget.style.background = '#1e3a8a';
-                            }
-                          }}
-                        >
-                          {course.status === 'complete' ? 'Complete The Course' : 'Enroll Now'}
-                        </button>
+                        {course.status === 'eligible' && (
+                          <span style={{ fontSize: '0.75rem', color: '#86efac' }}>
+                            Ready to generate
+                          </span>
+                        )}
                       </div>
-                    ))}
-                  </div>
-                </div>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => handleAction(course)}
+                        style={{
+                          padding: '0.5rem 1.25rem',
+                          borderRadius: 6,
+                          border: 'none',
+                          fontSize: '0.875rem',
+                          fontWeight: 600,
+                          cursor: busy ? 'wait' : 'pointer',
+                          transition: 'all 0.2s',
+                          background: colors.bg,
+                          color: 'white',
+                          whiteSpace: 'nowrap',
+                          opacity: busy ? 0.75 : 1,
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!busy) e.currentTarget.style.background = colors.hover;
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = colors.bg;
+                        }}
+                      >
+                        {busy ? 'Generating…' : actionLabel(course.status)}
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             </div>
-          )}
-        </main>
-      </div>
-    </>
+          </div>
+        </div>
+      )}
+
+      {toast && (
+        <div
+          role="status"
+          style={{
+            position: 'fixed',
+            bottom: 24,
+            right: 24,
+            zIndex: 1100,
+            background: '#166534',
+            color: 'white',
+            padding: '0.75rem 1.25rem',
+            borderRadius: 8,
+            fontSize: '0.9rem',
+            fontWeight: 500,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+          }}
+        >
+          {toast}
+        </div>
+      )}
+    </DashboardShell>
   );
 }
-
