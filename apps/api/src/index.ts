@@ -11,6 +11,7 @@ import { leaderboardRoutes } from './routes/leaderboard';
 import { executionRoutes } from './routes/execution';
 import { interviewRoutes } from './routes/interview';
 import { courseRoutes } from './routes/courses';
+import { careersRoutes } from './routes/careers';
 import { connectRedis, disconnectRedis } from './services/redisService';
 import {
   assertEmailConfigForRuntime,
@@ -40,6 +41,7 @@ app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/execute', executionRoutes);
 app.use('/api/interview', interviewRoutes);
 app.use('/api/courses', courseRoutes);
+app.use('/api/careers', careersRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
