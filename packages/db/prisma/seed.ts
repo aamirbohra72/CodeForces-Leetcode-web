@@ -1,6 +1,7 @@
 import { PrismaClient, UserRole, ContestStatus } from '@prisma/client';
 import * as dotenv from 'dotenv';
 import { resolve } from 'path';
+import { interviewPracticeChallenges } from './interview-practice-challenges';
 
 // Load environment variables - try root .env first, then apps/api/.env
 dotenv.config({ path: resolve(process.cwd(), '.env') });
@@ -77,6 +78,19 @@ async function main() {
     },
   });
 
+  const interviewPracticeContest = await prisma.contest.create({
+    data: {
+      name: 'Interview Practice — JavaScript & React',
+      description: 'Curated frontend interview prompts with company tags for /practice',
+      startTime: new Date(now.getTime() - 3 * 60 * 60 * 1000),
+      endTime: new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000),
+      status: ContestStatus.LIVE,
+      challenges: {
+        create: [...interviewPracticeChallenges],
+      },
+    },
+  });
+
   const endedContest = await prisma.contest.create({
     data: {
       name: 'Ended Contest 2024',
@@ -101,9 +115,68 @@ async function main() {
     },
   });
 
+  const seededChallenges = await prisma.challenge.findMany({
+    where: {
+      contestId: {
+        in: [liveContest.id, interviewPracticeContest.id, endedContest.id],
+      },
+    },
+    select: {
+      id: true,
+      title: true,
+      sampleInput: true,
+      sampleOutput: true,
+    },
+  });
+
+  // Baseline: every seeded challenge gets a sample case in structured testcase table.
+  await prisma.challengeTestCase.createMany({
+    data: seededChallenges
+      .filter((c) => c.sampleOutput.trim().length > 0)
+      .map((c) => ({
+        challengeId: c.id,
+        input: c.sampleInput,
+        expectedOutput: c.sampleOutput,
+        isSample: true,
+        isHidden: false,
+        order: 1,
+      })),
+  });
+
+  // Add hidden cases for a subset to simulate production-style judging.
+  const titleToId = new Map(seededChallenges.map((c) => [c.title, c.id]));
+  const hiddenCases: Array<{ title: string; input: string; expectedOutput: string; order: number }> = [
+    { title: 'Anagram Checker', input: 'hello\nworld', expectedOutput: 'NO', order: 2 },
+    { title: 'Anagram Checker', input: 'Dormitory\ndirtyroom', expectedOutput: 'YES', order: 3 },
+    { title: 'Power of Four', input: '64', expectedOutput: 'true', order: 2 },
+    { title: 'Power of Four', input: '12', expectedOutput: 'false', order: 3 },
+    { title: 'Voting Eligibility', input: '18', expectedOutput: 'ELIGIBLE', order: 2 },
+    { title: 'Voting Eligibility', input: '17', expectedOutput: 'NOT ELIGIBLE', order: 3 },
+    { title: 'Hello World', input: '', expectedOutput: 'Hello, World!', order: 2 },
+  ];
+
+  await prisma.challengeTestCase.createMany({
+    data: hiddenCases
+      .map((tc) => {
+        const challengeId = titleToId.get(tc.title);
+        if (!challengeId) return null;
+        return {
+          challengeId,
+          input: tc.input,
+          expectedOutput: tc.expectedOutput,
+          isSample: false,
+          isHidden: true,
+          order: tc.order,
+        };
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null),
+  });
+
   console.log('Seed data created:');
   console.log({ admin: admin.email, user: user.email });
-  console.log({ contests: [upcomingContest.name, liveContest.name, endedContest.name] });
+  console.log({
+    contests: [upcomingContest.name, liveContest.name, interviewPracticeContest.name, endedContest.name],
+  });
 }
 
 main()

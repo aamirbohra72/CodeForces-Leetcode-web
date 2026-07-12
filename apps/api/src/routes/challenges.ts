@@ -4,7 +4,8 @@ import { authenticate, requireAdmin } from '../middleware/auth';
 
 export const challengeRoutes = Router();
 
-// Public routes
+// Public routes (static paths before /:id)
+challengeRoutes.get('/companies', challengeController.getCompanies);
 challengeRoutes.get('/', challengeController.getAll);
 challengeRoutes.get('/:id', challengeController.getById);
 

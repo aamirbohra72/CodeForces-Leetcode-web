@@ -55,7 +55,7 @@ type MistralChatResponse = {
   message?: string;
 };
 
-async function mistralChatJson(system: string, user: string): Promise<string> {
+export async function mistralChatJson(system: string, user: string): Promise<string> {
   const apiKey = getApiKey();
   const body: Record<string, unknown> = {
     model: chatModel(),

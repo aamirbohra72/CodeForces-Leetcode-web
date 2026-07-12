@@ -35,6 +35,10 @@ export interface Challenge {
   constraints: string;
   sampleInput: string;
   sampleOutput: string;
+  /** When set, used for /practice language filter and badges (JavaScript vs React.js) */
+  practiceLanguage?: string | null;
+  companies?: string[];
+  estimatedTime?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }

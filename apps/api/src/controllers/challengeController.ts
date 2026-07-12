@@ -13,19 +13,63 @@ const createChallengeSchema = z.object({
   constraints: z.string(),
   sampleInput: z.string(),
   sampleOutput: z.string(),
+  practiceLanguage: z.string().nullable().optional(),
+  companies: z.array(z.string()).optional(),
+  estimatedTime: z.string().nullable().optional(),
 });
 
 const updateChallengeSchema = createChallengeSchema.partial().omit({ contestId: true });
 
+function parseCompaniesQuery(raw: unknown): string[] {
+  if (raw == null || raw === '') return [];
+  const parts = Array.isArray(raw) ? raw : [raw];
+  return parts
+    .flatMap((p) => String(p).split(','))
+    .map((c) => c.trim())
+    .filter(Boolean);
+}
+
+/** Distinct company names from all challenges (for /practice sidebar). */
+async function getDistinctCompanyNames(): Promise<string[]> {
+  const rows = await prisma.challenge.findMany({
+    select: { companies: true },
+  });
+  const set = new Set<string>();
+  for (const r of rows) {
+    for (const c of r.companies) {
+      set.add(c);
+    }
+  }
+  return [...set].sort((a, b) => a.localeCompare(b));
+}
+
 export const challengeController = {
+  async getCompanies(_req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const names = await getDistinctCompanyNames();
+      res.json(names);
+    } catch (error) {
+      throw error;
+    }
+  },
+
   async getAll(req: AuthRequest, res: Response): Promise<void> {
     try {
-      const { difficulty, search } = req.query;
+      const { difficulty, search, language } = req.query;
+      const companiesFilter = parseCompaniesQuery(req.query.companies);
 
       const where: any = {};
 
       if (difficulty && difficulty !== 'All') {
-        where.difficulty = difficulty;
+        where.difficulty = { equals: String(difficulty), mode: 'insensitive' };
+      }
+
+      if (language && language !== 'All') {
+        where.practiceLanguage = String(language);
+      }
+
+      if (companiesFilter.length > 0) {
+        where.companies = { hasSome: companiesFilter };
       }
 
       if (search) {
@@ -122,6 +166,9 @@ export const challengeController = {
           constraints: data.constraints,
           sampleInput: data.sampleInput,
           sampleOutput: data.sampleOutput,
+          practiceLanguage: data.practiceLanguage ?? undefined,
+          companies: data.companies ?? undefined,
+          estimatedTime: data.estimatedTime ?? undefined,
         },
       });
 

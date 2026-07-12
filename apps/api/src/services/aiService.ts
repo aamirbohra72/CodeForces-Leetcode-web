@@ -7,9 +7,34 @@ export interface CodeEvaluationResult {
   feedback: string;
 }
 
+type JudgeCase = {
+  input: string;
+  expectedOutput: string;
+  isHidden: boolean;
+  order: number;
+};
+
 // Helper function to normalize output (trim whitespace, normalize line endings)
 function normalizeOutput(output: string): string {
   return output.trim().replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+}
+
+function classifyExecutionFailure(errorMessage: string, exitCode: number): CodeEvaluationResult['status'] {
+  const errorLower = errorMessage.toLowerCase();
+  if (
+    errorLower.includes('syntax') ||
+    errorLower.includes('compile') ||
+    errorLower.includes('parse') ||
+    errorLower.includes('unexpected') ||
+    errorLower.includes('javac') ||
+    errorLower.includes('g++')
+  ) {
+    return 'COMPILATION_ERROR';
+  }
+  if (errorLower.includes('timeout') || exitCode === 124) {
+    return 'TIME_LIMIT_EXCEEDED';
+  }
+  return 'RUNTIME_ERROR';
 }
 
 // Helper function to prepare code with input handling
@@ -76,13 +101,22 @@ export async function evaluateCode(
   challengeId: string
 ): Promise<CodeEvaluationResult> {
   try {
-    // Fetch challenge to get sample input and output
+    // Fetch challenge + dedicated test cases (sample + hidden).
     const challenge = await prisma.challenge.findUnique({
       where: { id: challengeId },
       select: {
         sampleInput: true,
         sampleOutput: true,
         title: true,
+        testCases: {
+          select: {
+            input: true,
+            expectedOutput: true,
+            isHidden: true,
+            order: true,
+          },
+          orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
+        },
       },
     });
 
@@ -94,27 +128,30 @@ export async function evaluateCode(
       };
     }
 
-    // If no sample input/output, just check if code compiles/executes
-    if (!challenge.sampleInput || !challenge.sampleOutput) {
+    const cases: JudgeCase[] =
+      challenge.testCases.length > 0
+        ? challenge.testCases
+        : challenge.sampleOutput
+          ? [
+              {
+                input: challenge.sampleInput ?? '',
+                expectedOutput: challenge.sampleOutput,
+                isHidden: false,
+                order: 1,
+              },
+            ]
+          : [];
+
+    // No available test case -> compile/run health check only.
+    if (cases.length === 0) {
       const result = await codeExecutionService.executeCode(sourceCode, language, 5000);
-      
+
       if (result.error && result.exitCode !== 0) {
-        // Check if it's a compilation error
-        const errorLower = result.error.toLowerCase();
-        if (errorLower.includes('syntax') || 
-            errorLower.includes('compile') || 
-            errorLower.includes('parse') ||
-            errorLower.includes('unexpected')) {
-          return {
-            status: 'COMPILATION_ERROR',
-            score: 0,
-            feedback: `Compilation error: ${result.error}`,
-          };
-        }
+        const status = classifyExecutionFailure(result.error, result.exitCode);
         return {
-          status: 'RUNTIME_ERROR',
+          status,
           score: 0,
-          feedback: `Runtime error: ${result.error}`,
+          feedback: `${status === 'COMPILATION_ERROR' ? 'Compilation' : 'Runtime'} error: ${result.error}`,
         };
       }
 
@@ -125,64 +162,57 @@ export async function evaluateCode(
       };
     }
 
-    // Prepare code with input handling
-    const codeWithInput = prepareCodeWithInput(sourceCode, language, challenge.sampleInput);
-    
-    // Execute code with timeout
-    const result = await codeExecutionService.executeCode(codeWithInput, language, 10000);
+    let passed = 0;
+    for (let idx = 0; idx < cases.length; idx += 1) {
+      const judgeCase = cases[idx];
+      const codeWithInput = prepareCodeWithInput(sourceCode, language, judgeCase.input);
+      const result = await codeExecutionService.executeCode(codeWithInput, language, 10000);
 
-    // Check for execution errors
-    if (result.error && result.exitCode !== 0) {
-      const errorLower = result.error.toLowerCase();
-      
-      // Check if it's a compilation error
-      if (errorLower.includes('syntax') || 
-          errorLower.includes('compile') || 
-          errorLower.includes('parse') ||
-          errorLower.includes('unexpected') ||
-          errorLower.includes('javac') ||
-          errorLower.includes('g++')) {
+      if (result.error && result.exitCode !== 0) {
+        const status = classifyExecutionFailure(result.error, result.exitCode);
+        const visibleCaseNo = judgeCase.isHidden ? 'hidden' : `${idx + 1}`;
         return {
-          status: 'COMPILATION_ERROR',
-          score: 0,
-          feedback: `Compilation error: ${result.error.substring(0, 500)}`,
+          status,
+          score: Math.round((passed / cases.length) * 100),
+          feedback:
+            status === 'TIME_LIMIT_EXCEEDED'
+              ? `Time limit exceeded on test case #${visibleCaseNo}`
+              : `${status === 'COMPILATION_ERROR' ? 'Compilation' : 'Runtime'} error on test case #${visibleCaseNo}: ${result.error.substring(0, 400)}`,
         };
       }
 
-      // Check for timeout
-      if (errorLower.includes('timeout') || result.exitCode === 124) {
+      const actualOutput = normalizeOutput(result.output || '');
+      const expectedOutput = normalizeOutput(judgeCase.expectedOutput);
+      if (actualOutput !== expectedOutput) {
+        const caseLabel = judgeCase.isHidden ? 'hidden case' : `case #${idx + 1}`;
+        const details = judgeCase.isHidden
+          ? `Expected output does not match for ${caseLabel}.`
+          : `Expected "${expectedOutput}", got "${actualOutput.substring(0, 200)}".`;
         return {
-          status: 'TIME_LIMIT_EXCEEDED',
-          score: 0,
-          feedback: 'Code exceeded the time limit (10 seconds)',
+          status: 'WRONG_ANSWER',
+          score: Math.round((passed / cases.length) * 100),
+          feedback: `Wrong answer on ${caseLabel}. ${details}`,
         };
       }
 
-      // Runtime error
-      return {
-        status: 'RUNTIME_ERROR',
-        score: 0,
-        feedback: `Runtime error: ${result.error.substring(0, 500)}`,
-      };
+      passed += 1;
     }
 
-    // Compare output with expected output
-    const actualOutput = normalizeOutput(result.output || '');
-    const expectedOutput = normalizeOutput(challenge.sampleOutput);
-
-    if (actualOutput === expectedOutput) {
+    if (passed === cases.length) {
+      const hiddenCount = cases.filter((c) => c.isHidden).length;
       return {
         status: 'ACCEPTED',
         score: 100,
-        feedback: 'Code passed the sample test case! ✅',
-      };
-    } else {
-      return {
-        status: 'WRONG_ANSWER',
-        score: 0,
-        feedback: `Wrong answer. Expected: "${expectedOutput}", Got: "${actualOutput.substring(0, 200)}"`,
+        feedback: `Accepted. Passed ${cases.length} / ${cases.length} test cases (${hiddenCount} hidden).`,
       };
     }
+
+    // Defensive fallback (shouldn't happen due to returns inside loop).
+    return {
+      status: 'RUNTIME_ERROR',
+      score: Math.round((passed / cases.length) * 100),
+      feedback: 'Unexpected judge state.',
+    };
   } catch (error) {
     console.error('Error evaluating code:', error);
     return {

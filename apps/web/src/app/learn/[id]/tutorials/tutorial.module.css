@@ -1,0 +1,605 @@
+.wrap {
+  min-height: calc(100vh - 3.5rem);
+  background: #141414;
+  color: #f5f5f5;
+}
+
+.header {
+  padding: 1.1rem 1.35rem 0.75rem;
+  border-bottom: 1px solid #2a2a2a;
+  background: #1a1a1a;
+}
+
+.headerTop {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.back {
+  color: #9ca3af;
+  text-decoration: none;
+  font-size: 0.85rem;
+}
+
+.back:hover {
+  color: #22c55e;
+}
+
+.title {
+  margin: 0.35rem 0 0.2rem;
+  font-size: 1.2rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.date {
+  margin: 0;
+  color: #9ca3af;
+  font-size: 0.85rem;
+}
+
+.badge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: #f59e0b;
+  color: #111;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+.stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: center;
+  color: #c4c4c4;
+  font-size: 0.82rem;
+}
+
+.statPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  background: #222;
+  border: 1px solid #333;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.15rem;
+  padding: 0 1.35rem;
+  border-bottom: 1px solid #2a2a2a;
+  background: #1a1a1a;
+  overflow-x: auto;
+}
+
+.tab {
+  padding: 0.85rem 1rem;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: #9ca3af;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tabActive {
+  color: #22c55e;
+  border-bottom-color: #22c55e;
+}
+
+.body {
+  padding: 1.25rem 1.35rem 2.5rem;
+  max-width: 1100px;
+}
+
+/* Session card */
+.sessionCard {
+  display: grid;
+  grid-template-columns: minmax(220px, 340px) 1fr;
+  gap: 1.25rem;
+  background: #1c1c1e;
+  border: 1px solid #2c2c2e;
+  border-radius: 14px;
+  padding: 1.1rem;
+  align-items: stretch;
+}
+
+.thumb {
+  border-radius: 12px;
+  min-height: 180px;
+  background: linear-gradient(135deg, #1d4ed8, #7c3aed);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 1rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.playBtn {
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(255, 255, 255, 0.95);
+  color: #1d4ed8;
+  font-size: 1.25rem;
+  font-weight: 800;
+  cursor: pointer;
+  align-self: center;
+  margin: auto 0;
+}
+
+.thumbTitle {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.35;
+}
+
+.sessionInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  justify-content: center;
+}
+
+.recordingTag {
+  width: fit-content;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.sessionTitle {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.sessionMeta {
+  margin: 0;
+  color: #9ca3af;
+  font-size: 0.88rem;
+}
+
+.watchBtn {
+  width: fit-content;
+  margin-top: 0.35rem;
+  padding: 0.7rem 1.15rem;
+  border: none;
+  border-radius: 8px;
+  background: #ef4444;
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.watchBtn:hover {
+  background: #dc2626;
+}
+
+.rewards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.reward {
+  padding: 0.55rem 0.8rem;
+  border-radius: 10px;
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  color: #d1d5db;
+  font-size: 0.82rem;
+}
+
+.coinRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem;
+  margin-top: 1.1rem;
+}
+
+.coinCard {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  min-width: 220px;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  background: #1c1c1e;
+  border: 1px solid #2c2c2e;
+}
+
+.coinIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: linear-gradient(145deg, #fbbf24, #d97706);
+  color: #111;
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.coinAmount {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #fef3c7;
+}
+
+.coinDesc {
+  margin: 0.15rem 0 0;
+  color: #9ca3af;
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.coinMuted {
+  opacity: 0.55;
+}
+
+.learnGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(240px, 0.8fr);
+  gap: 1rem;
+  margin-top: 1.5rem;
+  align-items: start;
+}
+
+.sectionTitle {
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.sectionSub {
+  margin: 0 0 0.85rem;
+  color: #9ca3af;
+  font-size: 0.8rem;
+}
+
+.flashProgress {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-bottom: 0.75rem;
+}
+
+.flashDots {
+  display: flex;
+  flex: 1;
+  gap: 0.25rem;
+  overflow: hidden;
+}
+
+.flashDot {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: #2a2a2a;
+}
+
+.flashDotActive {
+  background: #a78bfa;
+}
+
+.flashCount {
+  color: #9ca3af;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.flashCard {
+  background: #1c1c1e;
+  border: 1px solid #2c2c2e;
+  border-radius: 14px;
+  padding: 1.35rem 1.25rem;
+  min-height: 180px;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  transition: transform 0.15s ease;
+}
+
+.flashCard:hover {
+  transform: translateY(-2px);
+}
+
+.flashLabel {
+  margin: 0 0 0.65rem;
+  text-align: center;
+  color: #a78bfa;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.flashText {
+  margin: 0;
+  text-align: center;
+  font-size: 1rem;
+  line-height: 1.55;
+  color: #f5f5f5;
+}
+
+.flashNav {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+}
+
+.flashBtn {
+  padding: 0.5rem 0.9rem;
+  border-radius: 8px;
+  border: 1px solid #3a3a3a;
+  background: #222;
+  color: #e5e5e5;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.flashBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.matchCard {
+  background: #1c1c1e;
+  border: 1px solid #2c2c2e;
+  border-radius: 14px;
+  padding: 1rem;
+}
+
+.matchGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.55rem;
+  margin-top: 0.75rem;
+}
+
+.matchTile {
+  padding: 0.75rem;
+  border-radius: 10px;
+  background: rgba(167, 139, 250, 0.12);
+  border: 1px solid rgba(167, 139, 250, 0.25);
+  color: #e9d5ff;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  min-height: 64px;
+}
+
+.notesWrap {
+  margin-top: 1.5rem;
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid #2c2c2e;
+  background: #1c1c1e;
+}
+
+.notesRail {
+  background: #f59e0b;
+  color: #111;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.notesBody {
+  padding: 1.15rem 1.25rem 1.25rem;
+}
+
+.notesTitle {
+  margin: 0 0 0.65rem;
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+.notesIntro {
+  margin: 0 0 1rem;
+  color: #d1d5db;
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+
+.concept {
+  margin-bottom: 0.85rem;
+}
+
+.concept h4 {
+  margin: 0 0 0.25rem;
+  font-size: 0.92rem;
+  color: #fbbf24;
+}
+
+.concept p {
+  margin: 0;
+  color: #c4c4c4;
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+/* Assignment table */
+.layout {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 1rem;
+  align-items: start;
+}
+
+.qNav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  align-items: center;
+  padding: 0.5rem 0;
+}
+
+.qPill {
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  border: 1px solid #3a3a3a;
+  background: #222;
+  color: #e5e5e5;
+  font-size: 0.72rem;
+  font-weight: 800;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  text-decoration: none;
+}
+
+.qPillSolved {
+  border-color: #22c55e;
+  color: #22c55e;
+}
+
+.tableWrap {
+  overflow-x: auto;
+  border: 1px solid #2c2c2e;
+  border-radius: 12px;
+  background: #1c1c1e;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 760px;
+}
+
+.table th,
+.table td {
+  padding: 0.85rem 0.9rem;
+  text-align: left;
+  border-bottom: 1px solid #2a2a2a;
+  font-size: 0.88rem;
+}
+
+.table th {
+  color: #9ca3af;
+  font-weight: 700;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: #181818;
+}
+
+.problemName {
+  color: #f5f5f5;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.problemName:hover {
+  color: #22c55e;
+}
+
+.diff {
+  color: #f59e0b;
+  font-weight: 700;
+}
+
+.score {
+  font-weight: 700;
+  color: #e5e5e5;
+}
+
+.scoreDone {
+  color: #22c55e;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.statusSolved {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.35);
+}
+
+.statusTodo {
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.solveBtn {
+  padding: 0.45rem 0.9rem;
+  border-radius: 8px;
+  border: none;
+  background: #2563eb;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.82rem;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.solveBtn:hover {
+  background: #1d4ed8;
+}
+
+.footNote {
+  margin: 0.85rem 0 0;
+  color: #9ca3af;
+  font-size: 0.8rem;
+}
+
+@media (max-width: 860px) {
+  .sessionCard {
+    grid-template-columns: 1fr;
+  }
+
+  .learnGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .qNav {
+    flex-direction: row;
+    overflow-x: auto;
+    justify-content: flex-start;
+  }
+}

@@ -94,6 +94,34 @@ export async function clearLeaderboard(contestId: string): Promise<void> {
   }
 }
 
+export async function cacheGet(key: string): Promise<string | null> {
+  if (!isConnected) return null;
+  try {
+    return await redisClient.get(key);
+  } catch (error) {
+    console.error('Redis cacheGet error:', error);
+    return null;
+  }
+}
+
+export async function cacheSet(key: string, value: string, ttlSeconds: number): Promise<void> {
+  if (!isConnected) return;
+  try {
+    await redisClient.set(key, value, { EX: ttlSeconds });
+  } catch (error) {
+    console.error('Redis cacheSet error:', error);
+  }
+}
+
+export async function cacheDel(key: string): Promise<void> {
+  if (!isConnected) return;
+  try {
+    await redisClient.del(key);
+  } catch (error) {
+    console.error('Redis cacheDel error:', error);
+  }
+}
+
 export { redisClient };
 
 
