@@ -28,6 +28,7 @@ const PRIMARY_LINKS = [
   { href: '/blog', label: 'Blog' },
   { href: '/billing', label: 'Billing' },
   { href: '/affiliate', label: 'Affiliate' },
+  { href: '/referral', label: 'Referral' },
 ] as const;
 
 /** Match route segment: exact for leaderboard, prefix for nested routes. */
@@ -41,7 +42,8 @@ function linkIsActive(pathname: string, href: string, override?: string) {
     href === '/blog' ||
     href === '/projects' ||
     href === '/billing' ||
-    href === '/affiliate'
+    href === '/affiliate' ||
+    href === '/referral'
   ) {
     return pathname === href;
   }

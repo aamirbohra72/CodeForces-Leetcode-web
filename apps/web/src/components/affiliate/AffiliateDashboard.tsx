@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AffiliateChartPlaceholder } from '@/components/affiliate/AffiliateChartPlaceholder';
 import { AffiliateCopyField } from '@/components/affiliate/AffiliateCopyField';
@@ -147,6 +148,12 @@ export function AffiliateDashboard() {
             to date ({approxUsd(m?.earnedInrTillDate ?? 0)}).
           </p>
           {loadError ? <p className="mt-2 text-sm text-amber-400">{loadError}</p> : null}
+          <p className="mt-3 text-sm text-[#a0a0a0]">
+            Looking to invite friends?{' '}
+            <Link href="/referral" className="font-semibold text-orange-400 hover:text-orange-300">
+              Join the Referral Program →
+            </Link>
+          </p>
         </header>
 
         <section className="rounded-xl border border-[#3a3a3a] bg-[#2a2a2a] p-6">
