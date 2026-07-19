@@ -1,226 +1,205 @@
-import { prisma } from '@codeforces/db';
-import { codeExecutionService } from './codeExecutionService';
+import { prisma, type JudgeMode } from '@codeforces/db';
+import {
+  DockerUnavailableError,
+  runDockerJudge,
+  type DockerJudgeResult,
+  type JudgeCaseInput,
+} from './dockerJudgeService';
+import { generatePracticeHint } from './practiceHintService';
 
 export interface CodeEvaluationResult {
   status: 'ACCEPTED' | 'WRONG_ANSWER' | 'TIME_LIMIT_EXCEEDED' | 'RUNTIME_ERROR' | 'COMPILATION_ERROR';
   score: number;
   feedback: string;
+  passed: number;
+  total: number;
+  resultJson: string;
+  hintText: string | null;
 }
 
-type JudgeCase = {
-  input: string;
-  expectedOutput: string;
-  isHidden: boolean;
-  order: number;
-};
-
-// Helper function to normalize output (trim whitespace, normalize line endings)
-function normalizeOutput(output: string): string {
-  return output.trim().replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+function redactResult(result: DockerJudgeResult): DockerJudgeResult {
+  return {
+    ...result,
+    cases: (result.cases ?? []).map((c) => {
+      if (c.isHidden) {
+        return {
+          name: 'hidden',
+          order: c.order,
+          isHidden: true,
+          isSample: false,
+          passed: c.passed,
+          status: c.status,
+          message: c.passed ? undefined : c.message || 'Hidden test case failed',
+        };
+      }
+      return c;
+    }),
+  };
 }
 
-function classifyExecutionFailure(errorMessage: string, exitCode: number): CodeEvaluationResult['status'] {
-  const errorLower = errorMessage.toLowerCase();
-  if (
-    errorLower.includes('syntax') ||
-    errorLower.includes('compile') ||
-    errorLower.includes('parse') ||
-    errorLower.includes('unexpected') ||
-    errorLower.includes('javac') ||
-    errorLower.includes('g++')
-  ) {
-    return 'COMPILATION_ERROR';
-  }
-  if (errorLower.includes('timeout') || exitCode === 124) {
-    return 'TIME_LIMIT_EXCEEDED';
-  }
-  return 'RUNTIME_ERROR';
-}
-
-// Helper function to prepare code with input handling
-// This is a simplified version - in production, you'd use proper stdin/stdout handling
-function prepareCodeWithInput(sourceCode: string, language: string, input: string): string {
-  const normalizedInput = input.trim();
-  const inputLines = normalizedInput.split('\n').filter(line => line.trim() !== '');
-  
-  switch (language.toLowerCase()) {
-    case 'javascript':
-      // For JavaScript, inject input as a variable and provide a simple readLine function
-      // This is a simplified approach - in production, use proper stdin handling
-      return `
-// Input data
-const inputLines = ${JSON.stringify(inputLines)};
-let inputIndex = 0;
-
-// Simple input reading function
-function readLine() {
-  if (inputIndex < inputLines.length) {
-    return inputLines[inputIndex++];
-  }
-  return '';
-}
-
-// User code
-${sourceCode}
-`;
-    
-    case 'python':
-      // For Python, inject input as a list
-      return `
-# Input data
-input_lines = ${JSON.stringify(inputLines)}
-input_index = 0
-
-# Simple input reading function
-def input_line():
-    global input_index
-    if input_index < len(input_lines):
-        line = input_lines[input_index]
-        input_index += 1
-        return line
-    return ''
-
-# User code
-${sourceCode}
-`;
-    
-    case 'java':
-    case 'cpp':
-      // For Java and C++, just execute the code as-is
-      // Proper input handling would require more complex wrapping
-      return sourceCode;
-    
+function deterministicHint(status: CodeEvaluationResult['status'], feedback: string): string {
+  switch (status) {
+    case 'WRONG_ANSWER':
+      return 'Compare your output formatting and edge cases against the sample. Re-check empty inputs, boundaries, and off-by-one errors before resubmitting.';
+    case 'COMPILATION_ERROR':
+      return 'Fix syntax/compile errors first. Ensure your entrypoint matches the starter signature and allowed language APIs.';
+    case 'RUNTIME_ERROR':
+      return 'A runtime exception occurred. Guard against null/undefined, invalid indexes, and unhandled promise rejections.';
+    case 'TIME_LIMIT_EXCEEDED':
+      return 'Your solution is too slow for the hidden cases. Look for O(n^2) patterns you can replace with hashing, two pointers, or binary search.';
     default:
-      return sourceCode;
+      return feedback;
   }
 }
 
 export async function evaluateCode(
   sourceCode: string,
   language: string,
-  challengeId: string
+  challengeId: string,
+  options?: { sampleOnly?: boolean },
 ): Promise<CodeEvaluationResult> {
-  try {
-    // Fetch challenge + dedicated test cases (sample + hidden).
-    const challenge = await prisma.challenge.findUnique({
-      where: { id: challengeId },
-      select: {
-        sampleInput: true,
-        sampleOutput: true,
-        title: true,
-        testCases: {
-          select: {
-            input: true,
-            expectedOutput: true,
-            isHidden: true,
-            order: true,
-          },
-          orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
+  const challenge = await prisma.challenge.findUnique({
+    where: { id: challengeId },
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      inputFormat: true,
+      outputFormat: true,
+      constraints: true,
+      judgeMode: true,
+      allowedLanguages: true,
+      judgeReady: true,
+      sampleInput: true,
+      sampleOutput: true,
+      testCases: {
+        select: {
+          name: true,
+          input: true,
+          expectedOutput: true,
+          specJson: true,
+          isHidden: true,
+          isSample: true,
+          order: true,
         },
+        orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
       },
-    });
+    },
+  });
 
-    if (!challenge) {
-      return {
-        status: 'RUNTIME_ERROR',
-        score: 0,
-        feedback: 'Challenge not found',
-      };
-    }
-
-    const cases: JudgeCase[] =
-      challenge.testCases.length > 0
-        ? challenge.testCases
-        : challenge.sampleOutput
-          ? [
-              {
-                input: challenge.sampleInput ?? '',
-                expectedOutput: challenge.sampleOutput,
-                isHidden: false,
-                order: 1,
-              },
-            ]
-          : [];
-
-    // No available test case -> compile/run health check only.
-    if (cases.length === 0) {
-      const result = await codeExecutionService.executeCode(sourceCode, language, 5000);
-
-      if (result.error && result.exitCode !== 0) {
-        const status = classifyExecutionFailure(result.error, result.exitCode);
-        return {
-          status,
-          score: 0,
-          feedback: `${status === 'COMPILATION_ERROR' ? 'Compilation' : 'Runtime'} error: ${result.error}`,
-        };
-      }
-
-      return {
-        status: 'ACCEPTED',
-        score: 100,
-        feedback: 'Code executed successfully (no test cases available)',
-      };
-    }
-
-    let passed = 0;
-    for (let idx = 0; idx < cases.length; idx += 1) {
-      const judgeCase = cases[idx];
-      const codeWithInput = prepareCodeWithInput(sourceCode, language, judgeCase.input);
-      const result = await codeExecutionService.executeCode(codeWithInput, language, 10000);
-
-      if (result.error && result.exitCode !== 0) {
-        const status = classifyExecutionFailure(result.error, result.exitCode);
-        const visibleCaseNo = judgeCase.isHidden ? 'hidden' : `${idx + 1}`;
-        return {
-          status,
-          score: Math.round((passed / cases.length) * 100),
-          feedback:
-            status === 'TIME_LIMIT_EXCEEDED'
-              ? `Time limit exceeded on test case #${visibleCaseNo}`
-              : `${status === 'COMPILATION_ERROR' ? 'Compilation' : 'Runtime'} error on test case #${visibleCaseNo}: ${result.error.substring(0, 400)}`,
-        };
-      }
-
-      const actualOutput = normalizeOutput(result.output || '');
-      const expectedOutput = normalizeOutput(judgeCase.expectedOutput);
-      if (actualOutput !== expectedOutput) {
-        const caseLabel = judgeCase.isHidden ? 'hidden case' : `case #${idx + 1}`;
-        const details = judgeCase.isHidden
-          ? `Expected output does not match for ${caseLabel}.`
-          : `Expected "${expectedOutput}", got "${actualOutput.substring(0, 200)}".`;
-        return {
-          status: 'WRONG_ANSWER',
-          score: Math.round((passed / cases.length) * 100),
-          feedback: `Wrong answer on ${caseLabel}. ${details}`,
-        };
-      }
-
-      passed += 1;
-    }
-
-    if (passed === cases.length) {
-      const hiddenCount = cases.filter((c) => c.isHidden).length;
-      return {
-        status: 'ACCEPTED',
-        score: 100,
-        feedback: `Accepted. Passed ${cases.length} / ${cases.length} test cases (${hiddenCount} hidden).`,
-      };
-    }
-
-    // Defensive fallback (shouldn't happen due to returns inside loop).
-    return {
-      status: 'RUNTIME_ERROR',
-      score: Math.round((passed / cases.length) * 100),
-      feedback: 'Unexpected judge state.',
-    };
-  } catch (error) {
-    console.error('Error evaluating code:', error);
+  if (!challenge) {
     return {
       status: 'RUNTIME_ERROR',
       score: 0,
-      feedback: `Evaluation error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      feedback: 'Challenge not found',
+      passed: 0,
+      total: 0,
+      resultJson: JSON.stringify({ status: 'RUNTIME_ERROR', feedback: 'Challenge not found' }),
+      hintText: null,
     };
   }
+
+  if (!challenge.judgeReady) {
+    return {
+      status: 'RUNTIME_ERROR',
+      score: 0,
+      feedback: 'This challenge is visible but judging is not ready yet.',
+      passed: 0,
+      total: 0,
+      resultJson: JSON.stringify({ status: 'RUNTIME_ERROR', feedback: 'Judge not ready' }),
+      hintText: null,
+    };
+  }
+
+  const lang = language.toLowerCase();
+  if (!challenge.allowedLanguages.map((l) => l.toLowerCase()).includes(lang)) {
+    return {
+      status: 'COMPILATION_ERROR',
+      score: 0,
+      feedback: `Language ${language} is not allowed for this challenge. Allowed: ${challenge.allowedLanguages.join(', ')}`,
+      passed: 0,
+      total: 0,
+      resultJson: JSON.stringify({ status: 'COMPILATION_ERROR', feedback: 'Language not allowed' }),
+      hintText: 'Pick an allowed language from the dropdown and use the provided starter code.',
+    };
+  }
+
+  const cases: JudgeCaseInput[] = challenge.testCases.map((tc) => ({
+    name: tc.name,
+    input: tc.input,
+    expectedOutput: tc.expectedOutput,
+    specJson: tc.specJson,
+    isHidden: tc.isHidden,
+    isSample: tc.isSample,
+    order: tc.order,
+  }));
+
+  if (cases.length === 0) {
+    return {
+      status: 'RUNTIME_ERROR',
+      score: 0,
+      feedback: 'No test cases configured for this challenge',
+      passed: 0,
+      total: 0,
+      resultJson: JSON.stringify({ status: 'RUNTIME_ERROR', feedback: 'No test cases' }),
+      hintText: null,
+    };
+  }
+
+  let raw: DockerJudgeResult;
+  try {
+    raw = await runDockerJudge({
+      mode: challenge.judgeMode as JudgeMode,
+      language: lang,
+      sourceCode,
+      cases,
+      timeoutMs: challenge.judgeMode === 'REACT_COMPONENT' ? 10000 : 5000,
+      sampleOnly: Boolean(options?.sampleOnly),
+    });
+  } catch (err) {
+    if (err instanceof DockerUnavailableError) {
+      return {
+        status: 'RUNTIME_ERROR',
+        score: 0,
+        feedback: 'Judge unavailable: Docker is required but not running.',
+        passed: 0,
+        total: cases.length,
+        resultJson: JSON.stringify({
+          status: 'RUNTIME_ERROR',
+          feedback: 'Docker judge unavailable',
+        }),
+        hintText: 'Start Docker Desktop and rebuild the judge image (codeforces-judge:1), then retry.',
+      };
+    }
+    throw err;
+  }
+
+  const safe = redactResult(raw);
+  const status = safe.status;
+  let hintText: string | null = null;
+  if (status !== 'ACCEPTED') {
+    hintText = await generatePracticeHint({
+      title: challenge.title,
+      description: challenge.description,
+      inputFormat: challenge.inputFormat,
+      outputFormat: challenge.outputFormat,
+      constraints: challenge.constraints,
+      language: lang,
+      sourceCode,
+      status,
+      feedback: safe.feedback,
+      publicCases: safe.cases.filter((c) => !c.isHidden),
+    }).catch(() => deterministicHint(status, safe.feedback));
+    if (!hintText) hintText = deterministicHint(status, safe.feedback);
+  }
+
+  return {
+    status,
+    score: safe.score,
+    feedback: safe.feedback,
+    passed: safe.passed,
+    total: safe.total,
+    resultJson: JSON.stringify(safe),
+    hintText,
+  };
 }
-
-

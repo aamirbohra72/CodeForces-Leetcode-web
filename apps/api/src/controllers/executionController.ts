@@ -1,50 +1,81 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import { z } from 'zod';
-import { codeExecutionService } from '../services/codeExecutionService';
+import { prisma } from '@codeforces/db';
+import { AuthRequest } from '../middleware/auth';
+import { evaluateCode } from '../services/aiService';
+import { DockerUnavailableError, isDockerJudgeAvailable } from '../services/dockerJudgeService';
 
 const executeCodeSchema = z.object({
-  code: z.string().min(1, 'Code is required'),
+  code: z.string().min(1, 'Code is required').max(100_000),
   language: z.enum(['javascript', 'python', 'java', 'cpp']).default('javascript'),
+  challengeId: z.string().min(1),
   timeout: z.number().optional().default(5000),
 });
 
 export const executionController = {
-  async execute(req: Request, res: Response): Promise<void> {
+  async execute(req: AuthRequest, res: Response): Promise<void> {
     try {
-      const data = executeCodeSchema.parse(req.body);
-      const { code, language, timeout } = data;
-
-      // Security: Basic code validation
-      if (code.length > 100000) {
-        res.status(400).json({ error: 'Code is too long. Maximum 100KB allowed.' });
+      if (!req.user) {
+        res.status(401).json({ error: 'Unauthorized' });
         return;
       }
 
-      // Execute code
-      const result = await codeExecutionService.executeCode(code, language, timeout);
-
-      if (result.error && result.exitCode !== 0) {
-        res.json({
-          success: false,
-          output: result.output,
-          error: result.error,
-          exitCode: result.exitCode,
+      const data = executeCodeSchema.parse(req.body);
+      const available = await isDockerJudgeAvailable();
+      if (!available) {
+        res.status(503).json({
+          error: 'Judge unavailable',
+          message: 'Docker is required to run code. Start Docker Desktop and ensure image codeforces-judge:1 exists.',
         });
-      } else {
-        res.json({
-          success: true,
-          output: result.output || 'Code executed successfully (no output)',
-          error: null,
-          exitCode: 0,
-        });
+        return;
       }
+
+      const challenge = await prisma.challenge.findUnique({
+        where: { id: data.challengeId },
+        select: {
+          id: true,
+          judgeReady: true,
+          allowedLanguages: true,
+        },
+      });
+
+      if (!challenge) {
+        res.status(404).json({ error: 'Challenge not found' });
+        return;
+      }
+
+      if (!challenge.allowedLanguages.map((l) => l.toLowerCase()).includes(data.language.toLowerCase())) {
+        res.status(400).json({
+          error: `Language not allowed. Use one of: ${challenge.allowedLanguages.join(', ')}`,
+        });
+        return;
+      }
+
+      // Run sample tests only — never hidden cases on /execute
+      const result = await evaluateCode(data.code, data.language, data.challengeId, {
+        sampleOnly: true,
+      });
+
+      res.json({
+        success: result.status === 'ACCEPTED',
+        status: result.status,
+        score: result.score,
+        output: result.feedback,
+        error: result.status === 'ACCEPTED' ? null : result.feedback,
+        result: JSON.parse(result.resultJson),
+        hintText: result.hintText,
+        exitCode: result.status === 'ACCEPTED' ? 0 : 1,
+      });
     } catch (error) {
       if (error instanceof z.ZodError) {
         res.status(400).json({ error: 'Validation error', details: error.errors });
+        return;
+      }
+      if (error instanceof DockerUnavailableError) {
+        res.status(503).json({ error: 'Judge unavailable', message: error.message });
         return;
       }
       throw error;
     }
   },
 };
-

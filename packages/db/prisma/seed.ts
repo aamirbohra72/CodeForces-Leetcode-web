@@ -1,16 +1,82 @@
-import { PrismaClient, UserRole, ContestStatus } from '@prisma/client';
+import { PrismaClient, UserRole, ContestStatus, JudgeMode } from '@prisma/client';
 import * as dotenv from 'dotenv';
 import { resolve } from 'path';
-import { interviewPracticeChallenges } from './interview-practice-challenges';
+import { getValidatedCatalog } from './catalog';
 
-// Load environment variables - try root .env first, then apps/api/.env
 dotenv.config({ path: resolve(process.cwd(), '.env') });
 dotenv.config({ path: resolve(process.cwd(), 'apps/api/.env') });
+dotenv.config({ path: resolve(__dirname, '../../../.env') });
+dotenv.config({ path: resolve(__dirname, '../../../apps/api/.env') });
 
 const prisma = new PrismaClient();
 
+async function upsertPracticeContest() {
+  const existing = await prisma.contest.findFirst({
+    where: { name: 'Interview Practice — JavaScript & React' },
+  });
+  if (existing) return existing;
+
+  const now = new Date();
+  return prisma.contest.create({
+    data: {
+      name: 'Interview Practice — JavaScript & React',
+      description: 'Curated frontend interview prompts with company tags for /practice',
+      startTime: new Date(now.getTime() - 3 * 60 * 60 * 1000),
+      endTime: new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000),
+      status: ContestStatus.LIVE,
+    },
+  });
+}
+
+async function seedCatalog(contestId: string) {
+  const catalog = getValidatedCatalog();
+
+  for (const challenge of catalog) {
+    const data = {
+      contestId,
+      slug: challenge.slug,
+      title: challenge.title,
+      description: challenge.description,
+      difficulty: challenge.difficulty,
+      practiceLanguage: challenge.practiceLanguage,
+      companies: challenge.companies,
+      estimatedTime: challenge.estimatedTime,
+      inputFormat: challenge.inputFormat,
+      outputFormat: challenge.outputFormat,
+      constraints: challenge.constraints,
+      sampleInput: challenge.sampleInput,
+      sampleOutput: challenge.sampleOutput,
+      judgeMode: challenge.judgeMode as JudgeMode,
+      allowedLanguages: challenge.allowedLanguages,
+      starterCode: challenge.starterCode,
+      judgeReady: challenge.judgeReady,
+    };
+
+    const saved = await prisma.challenge.upsert({
+      where: { slug: challenge.slug },
+      create: data,
+      update: data,
+    });
+
+    await prisma.challengeTestCase.deleteMany({ where: { challengeId: saved.id } });
+    await prisma.challengeTestCase.createMany({
+      data: challenge.testCases.map((tc) => ({
+        challengeId: saved.id,
+        name: tc.name,
+        input: tc.input,
+        expectedOutput: tc.expectedOutput,
+        specJson: tc.specJson ?? null,
+        isSample: tc.isSample,
+        isHidden: tc.isHidden,
+        order: tc.order,
+      })),
+    });
+  }
+
+  console.log(`Upserted ${catalog.length} catalog challenges with test cases`);
+}
+
 async function main() {
-  // Create admin user (no password needed with OTP auth)
   const admin = await prisma.user.upsert({
     where: { email: 'admin@codeforces.com' },
     update: {},
@@ -21,7 +87,6 @@ async function main() {
     },
   });
 
-  // Create regular user
   const user = await prisma.user.upsert({
     where: { email: 'user@codeforces.com' },
     update: {},
@@ -32,151 +97,23 @@ async function main() {
     },
   });
 
-  // Create demo contests
-  const now = new Date();
-  const upcomingContest = await prisma.contest.create({
-    data: {
-      name: 'Upcoming Contest 2024',
-      description: 'A contest that will start soon',
-      startTime: new Date(now.getTime() + 24 * 60 * 60 * 1000), // Tomorrow
-      endTime: new Date(now.getTime() + 27 * 60 * 60 * 1000), // 3 hours later
-      status: ContestStatus.UPCOMING,
-    },
-  });
+  const practiceContest = await upsertPracticeContest();
+  await seedCatalog(practiceContest.id);
 
-  const liveContest = await prisma.contest.create({
-    data: {
-      name: 'Live Contest 2024',
-      description: 'A contest that is currently running',
-      startTime: new Date(now.getTime() - 60 * 60 * 1000), // 1 hour ago
-      endTime: new Date(now.getTime() + 2 * 60 * 60 * 1000), // 1 hour from now
-      status: ContestStatus.LIVE,
-      challenges: {
-        create: [
-          {
-            title: 'Two Sum',
-            description: 'Given an array of integers, find two numbers that add up to a target.',
-            difficulty: 'EASY',
-            inputFormat: 'First line: n (number of elements)\nSecond line: n integers\nThird line: target',
-            outputFormat: 'Two indices (0-indexed)',
-            constraints: '2 <= n <= 10^5\n-10^9 <= nums[i] <= 10^9',
-            sampleInput: '4\n2 7 11 15\n9',
-            sampleOutput: '0 1',
-          },
-          {
-            title: 'Longest Substring',
-            description: 'Find the length of the longest substring without repeating characters.',
-            difficulty: 'MEDIUM',
-            inputFormat: 'A single string s',
-            outputFormat: 'An integer representing the length',
-            constraints: '0 <= s.length <= 5 * 10^4',
-            sampleInput: 'abcabcbb',
-            sampleOutput: '3',
-          },
-        ],
-      },
-    },
+  // Remove legacy uncatalogued challenges so /practice only shows complete statements.
+  const legacy = await prisma.challenge.findMany({
+    where: { slug: null },
+    select: { id: true },
   });
+  if (legacy.length > 0) {
+    const ids = legacy.map((c) => c.id);
+    await prisma.challengeTestCase.deleteMany({ where: { challengeId: { in: ids } } });
+    await prisma.submission.deleteMany({ where: { challengeId: { in: ids } } });
+    await prisma.challenge.deleteMany({ where: { id: { in: ids } } });
+    console.log(`Removed ${ids.length} legacy challenges without slug`);
+  }
 
-  const interviewPracticeContest = await prisma.contest.create({
-    data: {
-      name: 'Interview Practice — JavaScript & React',
-      description: 'Curated frontend interview prompts with company tags for /practice',
-      startTime: new Date(now.getTime() - 3 * 60 * 60 * 1000),
-      endTime: new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000),
-      status: ContestStatus.LIVE,
-      challenges: {
-        create: [...interviewPracticeChallenges],
-      },
-    },
-  });
-
-  const endedContest = await prisma.contest.create({
-    data: {
-      name: 'Ended Contest 2024',
-      description: 'A contest that has already ended',
-      startTime: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000), // 7 days ago
-      endTime: new Date(now.getTime() - 4 * 24 * 60 * 60 * 1000), // 4 days ago
-      status: ContestStatus.ENDED,
-      challenges: {
-        create: [
-          {
-            title: 'Hello World',
-            description: 'Print "Hello, World!"',
-            difficulty: 'EASY',
-            inputFormat: 'No input',
-            outputFormat: 'Print "Hello, World!"',
-            constraints: 'None',
-            sampleInput: '',
-            sampleOutput: 'Hello, World!',
-          },
-        ],
-      },
-    },
-  });
-
-  const seededChallenges = await prisma.challenge.findMany({
-    where: {
-      contestId: {
-        in: [liveContest.id, interviewPracticeContest.id, endedContest.id],
-      },
-    },
-    select: {
-      id: true,
-      title: true,
-      sampleInput: true,
-      sampleOutput: true,
-    },
-  });
-
-  // Baseline: every seeded challenge gets a sample case in structured testcase table.
-  await prisma.challengeTestCase.createMany({
-    data: seededChallenges
-      .filter((c) => c.sampleOutput.trim().length > 0)
-      .map((c) => ({
-        challengeId: c.id,
-        input: c.sampleInput,
-        expectedOutput: c.sampleOutput,
-        isSample: true,
-        isHidden: false,
-        order: 1,
-      })),
-  });
-
-  // Add hidden cases for a subset to simulate production-style judging.
-  const titleToId = new Map(seededChallenges.map((c) => [c.title, c.id]));
-  const hiddenCases: Array<{ title: string; input: string; expectedOutput: string; order: number }> = [
-    { title: 'Anagram Checker', input: 'hello\nworld', expectedOutput: 'NO', order: 2 },
-    { title: 'Anagram Checker', input: 'Dormitory\ndirtyroom', expectedOutput: 'YES', order: 3 },
-    { title: 'Power of Four', input: '64', expectedOutput: 'true', order: 2 },
-    { title: 'Power of Four', input: '12', expectedOutput: 'false', order: 3 },
-    { title: 'Voting Eligibility', input: '18', expectedOutput: 'ELIGIBLE', order: 2 },
-    { title: 'Voting Eligibility', input: '17', expectedOutput: 'NOT ELIGIBLE', order: 3 },
-    { title: 'Hello World', input: '', expectedOutput: 'Hello, World!', order: 2 },
-  ];
-
-  await prisma.challengeTestCase.createMany({
-    data: hiddenCases
-      .map((tc) => {
-        const challengeId = titleToId.get(tc.title);
-        if (!challengeId) return null;
-        return {
-          challengeId,
-          input: tc.input,
-          expectedOutput: tc.expectedOutput,
-          isSample: false,
-          isHidden: true,
-          order: tc.order,
-        };
-      })
-      .filter((x): x is NonNullable<typeof x> => x !== null),
-  });
-
-  console.log('Seed data created:');
-  console.log({ admin: admin.email, user: user.email });
-  console.log({
-    contests: [upcomingContest.name, liveContest.name, interviewPracticeContest.name, endedContest.name],
-  });
+  console.log('Seed data ready:', { admin: admin.email, user: user.email, practiceContest: practiceContest.name });
 }
 
 main()

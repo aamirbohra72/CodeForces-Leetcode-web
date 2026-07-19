@@ -4,12 +4,31 @@ import { prisma, SubmissionStatus } from '@codeforces/db';
 import { AuthRequest } from '../middleware/auth';
 import { evaluateCode } from '../services/aiService';
 import { addToLeaderboard } from '../services/redisService';
+import { DockerUnavailableError } from '../services/dockerJudgeService';
 
 const createSubmissionSchema = z.object({
-  challengeId: z.string(),
-  language: z.string(),
-  sourceCode: z.string().min(1),
+  challengeId: z.string().min(1),
+  language: z.enum(['javascript', 'python', 'java', 'cpp']),
+  sourceCode: z.string().min(1).max(100_000),
 });
+
+function publicSubmission(submission: {
+  id: string;
+  userId: string;
+  challengeId: string;
+  language: string;
+  sourceCode: string;
+  status: SubmissionStatus;
+  score: number;
+  aiResponse: string | null;
+  resultJson: string | null;
+  hintText: string | null;
+  submittedAt: Date;
+  updatedAt: Date;
+  challenge?: unknown;
+}) {
+  return submission;
+}
 
 export const submissionController = {
   async getAll(req: AuthRequest, res: Response): Promise<void> {
@@ -50,6 +69,7 @@ export const submissionController = {
               select: {
                 id: true,
                 title: true,
+                slug: true,
                 contest: {
                   select: {
                     id: true,
@@ -64,7 +84,7 @@ export const submissionController = {
       ]);
 
       res.json({
-        data: submissions,
+        data: submissions.map(publicSubmission),
         total,
         page: Number(page),
         pageSize: Number(pageSize),
@@ -117,6 +137,7 @@ export const submissionController = {
               select: {
                 id: true,
                 title: true,
+                slug: true,
                 contest: {
                   select: {
                     id: true,
@@ -172,13 +193,12 @@ export const submissionController = {
         return;
       }
 
-      // Users can only view their own submissions unless admin
       if (submission.userId !== req.user.userId && req.user.role !== 'ADMIN') {
         res.status(403).json({ error: 'Forbidden' });
         return;
       }
 
-      res.json(submission);
+      res.json(publicSubmission(submission));
     } catch (error) {
       throw error;
     }
@@ -193,7 +213,6 @@ export const submissionController = {
 
       const data = createSubmissionSchema.parse(req.body);
 
-      // Verify challenge exists and get contest info
       const challenge = await prisma.challenge.findUnique({
         where: { id: data.challengeId },
         include: {
@@ -206,20 +225,31 @@ export const submissionController = {
         return;
       }
 
-      // For contest submissions, check if contest is LIVE and active
-      // For practice problems, allow submissions regardless of contest status
+      if (!challenge.judgeReady) {
+        res.status(400).json({ error: 'Judging is not ready for this challenge yet.' });
+        return;
+      }
+
+      if (!challenge.allowedLanguages.map((l) => l.toLowerCase()).includes(data.language.toLowerCase())) {
+        res.status(400).json({
+          error: `Language not allowed. Use one of: ${challenge.allowedLanguages.join(', ')}`,
+        });
+        return;
+      }
+
       const isContestSubmission = challenge.contest.status === 'LIVE';
-      
       if (isContestSubmission) {
-        // Check if contest has started and not ended
         const now = new Date();
         if (now < challenge.contest.startTime || now > challenge.contest.endTime) {
-          res.status(400).json({ error: 'Contest is not currently active' });
-          return;
+          // Practice contest is LIVE long-term; still allow if within window.
+          // For true contests outside window, block.
+          if (!challenge.slug) {
+            res.status(400).json({ error: 'Contest is not currently active' });
+            return;
+          }
         }
       }
 
-      // Create submission with PENDING status
       const submission = await prisma.submission.create({
         data: {
           userId: req.user.userId,
@@ -233,6 +263,7 @@ export const submissionController = {
             select: {
               id: true,
               title: true,
+              slug: true,
               contest: {
                 select: {
                   id: true,
@@ -244,39 +275,45 @@ export const submissionController = {
         },
       });
 
-      // Evaluate code with AI (async, don't wait)
+      const userId = req.user.userId;
+
       evaluateCode(data.sourceCode, data.language, data.challengeId)
         .then(async (result) => {
-          // Update submission with result
           await prisma.submission.update({
             where: { id: submission.id },
             data: {
               status: result.status as SubmissionStatus,
               score: result.score,
               aiResponse: result.feedback,
+              resultJson: result.resultJson,
+              hintText: result.hintText,
             },
           });
 
-          // If accepted and it's a contest submission, update leaderboard in Redis
           if (result.status === 'ACCEPTED' && isContestSubmission) {
-            await addToLeaderboard(challenge.contest.id, req.user.userId, result.score);
+            await addToLeaderboard(challenge.contest.id, userId, result.score);
           }
         })
-        .catch((error) => {
+        .catch(async (error) => {
           console.error('Error evaluating submission:', error);
-          // Update submission to show error
-          prisma.submission
+          const message =
+            error instanceof DockerUnavailableError
+              ? 'Judge unavailable: Docker is required but not running.'
+              : 'Error during code evaluation';
+          await prisma.submission
             .update({
               where: { id: submission.id },
               data: {
                 status: SubmissionStatus.RUNTIME_ERROR,
-                aiResponse: 'Error during code evaluation',
+                aiResponse: message,
+                resultJson: JSON.stringify({ status: 'RUNTIME_ERROR', feedback: message }),
+                hintText: message,
               },
             })
             .catch(console.error);
         });
 
-      res.status(201).json(submission);
+      res.status(201).json(publicSubmission(submission));
     } catch (error) {
       if (error instanceof z.ZodError) {
         res.status(400).json({ error: 'Validation error', details: error.errors });

@@ -164,6 +164,11 @@ export default function PracticePage() {
                           <p className={styles.desc}>{preview}</p>
                           <div className={styles.tags}>
                             <span className={styles.tag}>{languageTag}</span>
+                            {problem.judgeReady === false ? (
+                              <span className={styles.tagMuted}>Judge pending</span>
+                            ) : (
+                              <span className={styles.tagMuted}>{problem.judgeMode || 'STDIN'}</span>
+                            )}
                             {topCompanies.map((c) => (
                               <span key={c} className={styles.tagMuted}>
                                 {c}

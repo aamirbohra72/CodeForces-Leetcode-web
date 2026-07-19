@@ -119,7 +119,27 @@ export const challengeController = {
       const challenge = await prisma.challenge.findUnique({
         where: { id },
         include: {
-          contest: true,
+          contest: {
+            select: {
+              id: true,
+              name: true,
+              status: true,
+              startTime: true,
+              endTime: true,
+            },
+          },
+          testCases: {
+            where: { isSample: true },
+            select: {
+              id: true,
+              name: true,
+              input: true,
+              expectedOutput: true,
+              isSample: true,
+              order: true,
+            },
+            orderBy: { order: 'asc' },
+          },
         },
       });
 
@@ -128,14 +148,29 @@ export const challengeController = {
         return;
       }
 
-      // Check if contest has started
       const now = new Date();
-      if (challenge.contest.status === 'UPCOMING' || now < challenge.contest.startTime) {
-        res.status(403).json({ error: 'Challenge is not available yet. Contest has not started.' });
-        return;
+      if (challenge.contest.status === 'UPCOMING' && now < challenge.contest.startTime) {
+        // Allow practice catalog challenges even if contest metadata says upcoming
+        if (!challenge.slug) {
+          res.status(403).json({ error: 'Challenge is not available yet. Contest has not started.' });
+          return;
+        }
       }
 
-      res.json(challenge);
+      const sampleCount = challenge.testCases.length;
+      const hiddenCount = await prisma.challengeTestCase.count({
+        where: { challengeId: challenge.id, isHidden: true },
+      });
+
+      res.json({
+        ...challenge,
+        sampleTestCases: challenge.testCases,
+        testCaseSummary: {
+          sampleCount,
+          hiddenCount,
+          totalCount: sampleCount + hiddenCount,
+        },
+      });
     } catch (error) {
       throw error;
     }

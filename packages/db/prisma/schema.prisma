@@ -30,6 +30,12 @@ enum SubmissionStatus {
   COMPILATION_ERROR
 }
 
+enum JudgeMode {
+  STDIN
+  JS_FUNCTION
+  REACT_COMPONENT
+}
+
 enum InterviewSessionStatus {
   IN_PROGRESS
   COMPLETED
@@ -105,8 +111,10 @@ model Contest {
 }
 
 model Challenge {
-  id               String   @id @default(cuid())
+  id               String    @id @default(cuid())
   contestId        String
+  /// Stable identity for upserts / catalog validation
+  slug             String?   @unique
   title            String
   description      String
   difficulty       String
@@ -118,11 +126,16 @@ model Challenge {
   /// Interview practice: "JavaScript" | "React.js" — optional for legacy algorithmic tasks
   practiceLanguage String?
   /// Companies commonly associated with this prompt (for filtering / badges)
-  companies        String[] @default([])
+  companies        String[]  @default([])
   /// Display-only estimate, e.g. "15 mins"
   estimatedTime    String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  judgeMode        JudgeMode @default(STDIN)
+  allowedLanguages String[]  @default(["javascript"])
+  starterCode      String?
+  /// When false, problem is visible but submissions are rejected until tests are ready
+  judgeReady       Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   contest     Contest             @relation(fields: [contestId], references: [id], onDelete: Cascade)
   submissions Submission[]
@@ -131,13 +144,18 @@ model Challenge {
   @@index([contestId])
   @@index([difficulty])
   @@index([practiceLanguage])
+  @@index([judgeMode])
+  @@index([judgeReady])
 }
 
 model ChallengeTestCase {
   id             String   @id @default(cuid())
   challengeId    String
+  name           String   @default("case")
   input          String
   expectedOutput String
+  /// Optional harness/spec payload (JSON) for JS_FUNCTION / REACT_COMPONENT modes
+  specJson       String?
   isSample       Boolean  @default(false)
   isHidden       Boolean  @default(true)
   order          Int      @default(0)
@@ -158,7 +176,12 @@ model Submission {
   sourceCode  String
   status      SubmissionStatus @default(PENDING)
   score       Int              @default(0)
+  /// Legacy free-text feedback (kept for backwards compatibility)
   aiResponse  String?
+  /// Structured judge diagnostics JSON (passed/total, cases, verdict details)
+  resultJson  String?
+  /// Conceptual AI/deterministic hint for wrong solutions (never reveals full answer)
+  hintText    String?
   submittedAt DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 

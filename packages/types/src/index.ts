@@ -27,6 +27,7 @@ export interface Contest {
 export interface Challenge {
   id: string;
   contestId: string;
+  slug?: string | null;
   title: string;
   description: string;
   difficulty: string;
@@ -39,8 +40,37 @@ export interface Challenge {
   practiceLanguage?: string | null;
   companies?: string[];
   estimatedTime?: string | null;
+  judgeMode?: 'STDIN' | 'JS_FUNCTION' | 'REACT_COMPONENT';
+  allowedLanguages?: string[];
+  starterCode?: string | null;
+  judgeReady?: boolean;
+  sampleTestCases?: Array<{
+    id: string;
+    name: string;
+    input: string;
+    expectedOutput: string;
+    isSample: boolean;
+    order: number;
+  }>;
+  testCaseSummary?: {
+    sampleCount: number;
+    hiddenCount: number;
+    totalCount: number;
+  };
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface SubmissionResultCase {
+  name: string;
+  order: number;
+  isHidden: boolean;
+  isSample: boolean;
+  passed: boolean;
+  status: string;
+  expected?: string;
+  actual?: string;
+  message?: string;
 }
 
 export interface Submission {
@@ -50,6 +80,10 @@ export interface Submission {
   language: string;
   sourceCode: string;
   status: SubmissionStatus;
+  score?: number;
+  aiResponse?: string | null;
+  resultJson?: string | null;
+  hintText?: string | null;
   submittedAt: Date;
   updatedAt: Date;
 }
