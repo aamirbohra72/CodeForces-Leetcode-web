@@ -52,6 +52,7 @@ export default function InterviewPage() {
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const lastSpokenQuestionRef = useRef<string | null>(null);
 
   const [phase, setPhase] = useState<Phase>('intro');
   const [error, setError] = useState<string | null>(null);
@@ -67,6 +68,10 @@ export default function InterviewPage() {
   const [needRelogin, setNeedRelogin] = useState(false);
   /** Avoid hydration mismatch: `getToken()` is always null on the server. */
   const [hasMounted, setHasMounted] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [speechSupported, setSpeechSupported] = useState(true);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [showQuestionText, setShowQuestionText] = useState(false);
 
   const syncTimer = useCallback((endsAt: string) => {
     const end = new Date(endsAt).getTime();
@@ -83,13 +88,52 @@ export default function InterviewPage() {
 
   useEffect(() => {
     setHasMounted(true);
+    setSpeechSupported('speechSynthesis' in window && 'SpeechSynthesisUtterance' in window);
   }, []);
 
   useEffect(() => {
     return () => {
       mediaStreamRef.current?.getTracks().forEach((t) => t.stop());
+      window.speechSynthesis?.cancel();
     };
   }, []);
+
+  const speakQuestion = useCallback(
+    (question: string, force = false) => {
+      if ((!voiceEnabled && !force) || !question) return;
+      if (!('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) {
+        setSpeechSupported(false);
+        setShowQuestionText(true);
+        return;
+      }
+
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(question);
+      utterance.lang = 'en-US';
+      utterance.rate = 0.95;
+      utterance.onstart = () => setIsSpeaking(true);
+      utterance.onend = () => setIsSpeaking(false);
+      utterance.onerror = () => {
+        setIsSpeaking(false);
+        setShowQuestionText(true);
+      };
+      lastSpokenQuestionRef.current = question;
+      window.speechSynthesis.speak(utterance);
+    },
+    [voiceEnabled],
+  );
+
+  useEffect(() => {
+    const question = session?.currentQuestion;
+    if (
+      phase === 'live' &&
+      voiceEnabled &&
+      question &&
+      lastSpokenQuestionRef.current !== question
+    ) {
+      speakQuestion(question);
+    }
+  }, [phase, session?.currentQuestion, speakQuestion, voiceEnabled]);
 
   useEffect(() => {
     const v = videoRef.current;
@@ -106,6 +150,8 @@ export default function InterviewPage() {
   const stopMedia = () => {
     mediaStreamRef.current?.getTracks().forEach((t) => t.stop());
     mediaStreamRef.current = null;
+    window.speechSynthesis?.cancel();
+    setIsSpeaking(false);
     if (videoRef.current) videoRef.current.srcObject = null;
   };
 
@@ -156,6 +202,8 @@ export default function InterviewPage() {
       setPhase('live');
       setLastFeedback(null);
       setTextAnswer('');
+      setShowQuestionText(false);
+      lastSpokenQuestionRef.current = null;
     } catch (e) {
       stopMedia();
       setHasVideoTrack(false);
@@ -170,6 +218,8 @@ export default function InterviewPage() {
     const stream = mediaStreamRef.current;
     if (!stream) return;
 
+    window.speechSynthesis?.cancel();
+    setIsSpeaking(false);
     const audioOnly = new MediaStream(stream.getAudioTracks());
     chunksRef.current = [];
     const mime = pickRecorderMime();
@@ -379,12 +429,12 @@ export default function InterviewPage() {
         Back to dashboard
       </Link>
 
-      <h1 className="text-2xl font-semibold text-white mb-2">JS engineer interview (10 min)</h1>
+      <h1 className="text-2xl font-semibold text-white mb-2">
+        Adaptive audio problem session (10 min)
+      </h1>
       <p className="text-[#b0b0b0] text-sm mb-6">
-        A working <strong className="text-[#e5e5e5]">microphone</strong> is required. The camera is optional
-        (local preview only; no video is uploaded). If your camera fails, the interview still works on audio
-        or typed answers. You must stay logged in. Production sites must use <strong className="text-[#e5e5e5]">HTTPS</strong>{' '}
-        (except localhost).
+        Each problem is spoken aloud. Answer by microphone and the next question will adapt to your
+        response. The camera is optional and stays in your browser; no video is uploaded.
       </p>
 
       {(phase === 'live' || phase === 'uploading') && (
@@ -422,7 +472,7 @@ export default function InterviewPage() {
             onClick={() => void startInterview()}
             className="rounded-lg bg-[#22c55e] px-4 py-2.5 text-sm font-medium text-black hover:bg-[#1ea34a]"
           >
-            Start interview (mic required, camera optional)
+            Start audio session
           </button>
         </div>
       )}
@@ -463,7 +513,61 @@ export default function InterviewPage() {
           )}
 
           <div className="rounded-lg border border-[#3a3a3a] bg-[#252525] p-4">
-            <p className="text-white text-sm leading-relaxed">{session.currentQuestion}</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <div
+                className="flex min-h-10 flex-1 items-center gap-3 text-sm text-white"
+                role="status"
+                aria-label={isSpeaking ? 'Problem is being spoken' : 'Audio problem ready'}
+              >
+                <span
+                  className={`inline-block h-3 w-3 rounded-full ${
+                    isSpeaking ? 'animate-pulse bg-[#22c55e]' : 'bg-[#666]'
+                  }`}
+                />
+                {isSpeaking ? 'Playing problem…' : 'Audio problem ready'}
+              </div>
+              <button
+                type="button"
+                onClick={() => session.currentQuestion && speakQuestion(session.currentQuestion, true)}
+                disabled={!session.currentQuestion || !speechSupported}
+                className="rounded-md border border-[#4a4a4a] px-3 py-1.5 text-xs text-white hover:bg-[#333] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Replay
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const enabled = !voiceEnabled;
+                  setVoiceEnabled(enabled);
+                  if (!enabled) {
+                    window.speechSynthesis?.cancel();
+                    setIsSpeaking(false);
+                  } else if (session.currentQuestion) {
+                    speakQuestion(session.currentQuestion, true);
+                  }
+                }}
+                className="rounded-md border border-[#4a4a4a] px-3 py-1.5 text-xs text-white hover:bg-[#333]"
+              >
+                Voice {voiceEnabled ? 'on' : 'off'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowQuestionText((shown) => !shown)}
+                className="rounded-md border border-[#4a4a4a] px-3 py-1.5 text-xs text-white hover:bg-[#333]"
+              >
+                {showQuestionText ? 'Hide' : 'Show'} transcript
+              </button>
+            </div>
+            {(!speechSupported || showQuestionText) && (
+              <p className="mt-3 border-t border-[#3a3a3a] pt-3 text-sm leading-relaxed text-white">
+                {session.currentQuestion}
+              </p>
+            )}
+            {!speechSupported && (
+              <p className="mt-2 text-xs text-amber-300">
+                Speech playback is unavailable in this browser, so the transcript is shown.
+              </p>
+            )}
           </div>
 
           {lastFeedback && (

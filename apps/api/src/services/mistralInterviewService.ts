@@ -8,6 +8,10 @@ const turnGradeSchema = z.object({
   keyPointsMissing: z.array(z.string()).optional(),
 });
 
+const adaptiveTurnSchema = turnGradeSchema.extend({
+  nextQuestion: z.string().min(1).nullable(),
+});
+
 const finalReportSchema = z.object({
   verdict: z.enum(['SELECT', 'REJECT', 'BORDERLINE']),
   overallScore: z.number().min(0).max(100),
@@ -19,6 +23,7 @@ const finalReportSchema = z.object({
 });
 
 export type TurnGrade = z.infer<typeof turnGradeSchema>;
+export type AdaptiveTurn = z.infer<typeof adaptiveTurnSchema>;
 export type FinalReport = z.infer<typeof finalReportSchema>;
 
 function getApiKey(): string {
@@ -137,6 +142,40 @@ export async function gradeTurn(question: string, transcript: string): Promise<T
   });
   const raw = await mistralChatJson(system, user);
   return parseJson(raw, turnGradeSchema);
+}
+
+export async function gradeTurnAndGenerateNext(
+  question: string,
+  transcript: string,
+  previousTurns: Array<{ questionText: string; transcript: string; score: number }>,
+  shouldGenerateNext: boolean,
+): Promise<AdaptiveTurn> {
+  const system = `You run a short, spoken JavaScript problem-solving interview.
+Evaluate the candidate's latest answer fairly, then ${shouldGenerateNext ? 'write the next question' : 'end the session'}.
+When writing the next question:
+- Adapt it to the latest answer: probe an unclear claim, test a missing concept, or increase difficulty after a strong answer.
+- Keep continuity with the conversation, but do not repeat a previous question.
+- Ask exactly one concise question that is natural when read aloud.
+- Do not include markdown, code blocks, answer hints, or more than 45 words.
+Respond with JSON only matching:
+{"score":number 0-10,"feedback":string,"keyPointsMissing":string[],"nextQuestion":${shouldGenerateNext ? 'string' : 'null'}}.`;
+  const user = JSON.stringify({
+    previousTurns,
+    latestTurn: {
+      question,
+      candidateAnswerTranscript: transcript,
+    },
+  });
+  const raw = await mistralChatJson(system, user);
+  const result = parseJson(raw, adaptiveTurnSchema);
+
+  if (!shouldGenerateNext) {
+    return { ...result, nextQuestion: null };
+  }
+  if (!result.nextQuestion) {
+    throw new Error('Mistral did not generate the next interview question');
+  }
+  return result;
 }
 
 export async function generateFinalReport(

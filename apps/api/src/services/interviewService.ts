@@ -4,20 +4,31 @@ import {
   InterviewVerdict,
   type InterviewSession,
 } from '@codeforces/db';
-import { transcribeAudio, gradeTurn, generateFinalReport } from './mistralInterviewService';
+import {
+  transcribeAudio,
+  gradeTurnAndGenerateNext,
+  generateFinalReport,
+} from './mistralInterviewService';
 
 export const INTERVIEW_TEMPLATE_JS_10M = 'JS_ENGINEER_10M';
 
 /** Wall-clock duration for the interview slot (ms). */
 export const INTERVIEW_DURATION_MS = 10 * 60 * 1000;
 
-export const JS_ENGINEER_QUESTIONS: readonly string[] = [
-  'Explain closures in JavaScript and give one practical example where they matter in real code.',
-  'What is the event loop, and how do the microtask queue and macrotasks (like setTimeout) interact?',
-  'How is the value of `this` determined in JavaScript? Cover at least regular functions and arrow functions.',
-  'Compare async/await with Promise chains. When would you choose one over the other?',
-  'What are ES modules, and how do they differ from CommonJS `require`?',
-  'How would you structure error handling in an async Express route handler?',
+/** A short cap keeps the adaptive spoken session inside its ten-minute slot. */
+export const INTERVIEW_MAX_QUESTIONS = 6;
+
+export const INITIAL_JS_PROBLEM =
+  'A web page fetches user data when it loads, but sometimes renders stale data after the user quickly switches accounts. How would you diagnose and fix this asynchronous JavaScript problem?';
+
+/** Used only to let sessions created before adaptive questions were deployed finish safely. */
+const LEGACY_JS_ENGINEER_QUESTIONS: readonly string[] = [
+  INITIAL_JS_PROBLEM,
+  'What is the event loop, and how do the microtask queue and macrotasks like setTimeout interact?',
+  'How is the value of this determined in JavaScript for regular and arrow functions?',
+  'Compare async and await with Promise chains. When would you choose one over the other?',
+  'What are ES modules, and how do they differ from CommonJS require?',
+  'How would you structure error handling in an asynchronous Express route handler?',
 ] as const;
 
 function assertMistralConfigured(): void {
@@ -36,12 +47,14 @@ async function loadSessionForUser(
 }
 
 export function sessionPublicState(session: InterviewSession) {
-  const total = JS_ENGINEER_QUESTIONS.length;
   const now = new Date();
   const expired = now > session.endsAt;
   const currentQuestion =
-    session.status === InterviewSessionStatus.IN_PROGRESS && session.currentQuestion < total
-      ? JS_ENGINEER_QUESTIONS[session.currentQuestion]
+    session.status === InterviewSessionStatus.IN_PROGRESS &&
+    session.currentQuestion < INTERVIEW_MAX_QUESTIONS
+      ? session.currentQuestionText ??
+        LEGACY_JS_ENGINEER_QUESTIONS[session.currentQuestion] ??
+        null
       : null;
 
   return {
@@ -53,7 +66,7 @@ export function sessionPublicState(session: InterviewSession) {
     serverNow: now.toISOString(),
     timeExpired: expired,
     currentQuestionIndex: session.currentQuestion,
-    totalQuestions: total,
+    totalQuestions: INTERVIEW_MAX_QUESTIONS,
     currentQuestion,
     verdict: session.verdict,
     overallScore: session.overallScore,
@@ -80,6 +93,7 @@ export async function createInterviewSession(
       startedAt,
       endsAt,
       currentQuestion: 0,
+      currentQuestionText: INITIAL_JS_PROBLEM,
       status: InterviewSessionStatus.IN_PROGRESS,
     },
   });
@@ -114,11 +128,14 @@ export async function submitInterviewAnswer(
   }
 
   const qIndex = session.currentQuestion;
-  if (qIndex >= JS_ENGINEER_QUESTIONS.length) {
+  if (qIndex >= INTERVIEW_MAX_QUESTIONS) {
     throw new Error('NO_MORE_QUESTIONS');
   }
 
-  const questionText = JS_ENGINEER_QUESTIONS[qIndex];
+  const questionText =
+    session.currentQuestionText ??
+    LEGACY_JS_ENGINEER_QUESTIONS[qIndex] ??
+    INITIAL_JS_PROBLEM;
 
   let transcript = input.transcript?.trim() ?? '';
   if (input.audioBuffer && input.audioBuffer.length > 0) {
@@ -129,10 +146,19 @@ export async function submitInterviewAnswer(
     throw new Error('EMPTY_TRANSCRIPT');
   }
 
-  const grade = await gradeTurn(questionText, transcript);
-
   const nextIndex = qIndex + 1;
-  const isLast = nextIndex >= JS_ENGINEER_QUESTIONS.length;
+  const isLast = nextIndex >= INTERVIEW_MAX_QUESTIONS;
+  const previousTurns = await prisma.interviewTurn.findMany({
+    where: { sessionId: session.id },
+    orderBy: { order: 'asc' },
+    select: { questionText: true, transcript: true, score: true },
+  });
+  const grade = await gradeTurnAndGenerateNext(
+    questionText,
+    transcript,
+    previousTurns,
+    !isLast,
+  );
 
   await prisma.interviewTurn.create({
     data: {
@@ -171,6 +197,7 @@ export async function submitInterviewAnswer(
       data: {
         status: InterviewSessionStatus.COMPLETED,
         currentQuestion: nextIndex,
+        currentQuestionText: null,
         verdict: report.verdict as InterviewVerdict,
         overallScore: Math.round(report.overallScore),
         summaryJson: JSON.stringify(summaryPayload),
@@ -180,7 +207,10 @@ export async function submitInterviewAnswer(
   } else {
     await prisma.interviewSession.update({
       where: { id: session.id },
-      data: { currentQuestion: nextIndex },
+      data: {
+        currentQuestion: nextIndex,
+        currentQuestionText: grade.nextQuestion,
+      },
     });
   }
 
