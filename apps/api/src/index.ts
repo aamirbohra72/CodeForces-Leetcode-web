@@ -18,6 +18,10 @@ import {
   getEmailDeliveryMode,
   verifySmtpIfConfigured,
 } from './services/emailService';
+import {
+  startContestLifecycleJob,
+  stopContestLifecycleJob,
+} from './jobs/contestLifecycle';
 
 // Load env from known locations (Turbo/cwd may not be apps/api).
 const apiDir = path.resolve(__dirname, '..');
@@ -54,8 +58,12 @@ app.use(errorHandler);
 // Connect to Redis
 connectRedis().catch(console.error);
 
+// Auto-transition contest statuses and finalize leaderboards
+startContestLifecycleJob();
+
 // Graceful shutdown
 process.on('SIGTERM', async () => {
+  stopContestLifecycleJob();
   await disconnectRedis();
   process.exit(0);
 });

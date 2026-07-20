@@ -21,6 +21,13 @@ enum ContestStatus {
   ENDED
 }
 
+/// PRACTICE hosts the /practice catalog; RATED/UNRATED are time-boxed public contests
+enum ContestKind {
+  PRACTICE
+  RATED
+  UNRATED
+}
+
 enum SubmissionStatus {
   PENDING
   ACCEPTED
@@ -59,6 +66,7 @@ model User {
   submissions        Submission[]
   leaderboardEntries LeaderboardEntry[]
   interviewSessions  InterviewSession[]
+  contestRegistrations ContestRegistration[]
 
   @@index([email])
   @@index([username])
@@ -94,20 +102,42 @@ model LeaderboardEntry {
 
 model Contest {
   id          String        @id @default(cuid())
+  /// Stable identity for seed upserts (e.g. "weekly-sprint-1")
+  slug        String?       @unique
   name        String
   description String?
   startTime   DateTime
   endTime     DateTime
   status      ContestStatus @default(UPCOMING)
+  kind        ContestKind   @default(UNRATED)
+  /// Hidden from public list until published (admin drafts)
+  isPublished Boolean       @default(true)
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
   challenges         Challenge[]
   leaderboardEntries LeaderboardEntry[]
+  registrations      ContestRegistration[]
 
   @@index([status])
+  @@index([kind])
+  @@index([isPublished])
   @@index([startTime])
   @@index([endTime])
+}
+
+model ContestRegistration {
+  id           String   @id @default(cuid())
+  userId       String
+  contestId    String
+  registeredAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contest Contest @relation(fields: [contestId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, contestId])
+  @@index([contestId])
+  @@index([userId])
 }
 
 model Challenge {

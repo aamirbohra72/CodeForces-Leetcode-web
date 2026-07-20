@@ -2,26 +2,18 @@ import { prisma } from '@codeforces/db';
 import { getLeaderboard, clearLeaderboard } from './redisService';
 
 export async function finalizeContestLeaderboard(contestId: string): Promise<void> {
-  // Get leaderboard from Redis
   const redisLeaderboard = await getLeaderboard(contestId, 1000);
 
-  // Clear Redis leaderboard
-  await clearLeaderboard(contestId);
+  // Rank with tie handling (same score → same rank)
+  const ranked: Array<{ userId: string; score: number; rank: number }> = [];
+  for (let i = 0; i < redisLeaderboard.length; i += 1) {
+    const entry = redisLeaderboard[i];
+    const prev = ranked[i - 1];
+    const rank = prev && prev.score === entry.score ? prev.rank : i + 1;
+    ranked.push({ userId: entry.userId, score: entry.score, rank });
+  }
 
-  // Calculate ranks (handle ties)
-  const rankedLeaderboard = redisLeaderboard.map((entry, index) => {
-    // If score is same as previous, use same rank
-    const prevEntry = index > 0 ? rankedLeaderboard[index - 1] : null;
-    const rank = prevEntry && prevEntry.score === entry.score ? prevEntry.rank : index + 1;
-
-    return {
-      ...entry,
-      rank,
-    };
-  });
-
-  // Store in database
-  for (const entry of rankedLeaderboard) {
+  for (const entry of ranked) {
     await prisma.leaderboardEntry.upsert({
       where: {
         userId_contestId: {
@@ -41,6 +33,6 @@ export async function finalizeContestLeaderboard(contestId: string): Promise<voi
       },
     });
   }
+
+  await clearLeaderboard(contestId);
 }
-
-

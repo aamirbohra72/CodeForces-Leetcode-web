@@ -87,9 +87,9 @@ export function AppNavbar({ className, activeHref, activePage }: AppNavbarProps)
       aria-label="Main"
       className={cn('border-b border-nav-border bg-nav-bg text-white', className)}
     >
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
-        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-          <SidebarTrigger className="-ml-1 sm:-ml-0" />
+      <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 sm:gap-4 sm:px-6 lg:px-8">
+        <div className="relative z-10 flex shrink-0 items-center gap-2 bg-nav-bg sm:gap-3">
+          <SidebarTrigger />
           <Link
             href="/"
             className="font-nav-brand truncate text-xl font-bold tracking-tight text-white transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[#121212]"
@@ -98,24 +98,28 @@ export function AppNavbar({ className, activeHref, activePage }: AppNavbarProps)
           </Link>
         </div>
 
-        <div className="flex shrink-0 flex-wrap items-center justify-end gap-x-1 gap-y-2 sm:gap-x-3">
-          {PRIMARY_LINKS.map(({ href, label }) => {
-            const active = linkIsActive(pathname, href, resolvedActive);
-            return (
-              <Link
-                key={href}
-                href={href}
-                className={cn(
-                  'rounded-md px-2.5 py-1.5 text-sm font-medium text-white/90 transition-colors hover:bg-white/5 hover:text-white',
-                  active && 'bg-white/10 text-green-400',
-                )}
-                aria-current={active ? 'page' : undefined}
-              >
-                {label}
-              </Link>
-            );
-          })}
+        <div className="hidden min-w-0 flex-1 items-center overflow-x-auto md:flex [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="flex items-center gap-x-0.5 lg:gap-x-1">
+            {PRIMARY_LINKS.map(({ href, label }) => {
+              const active = linkIsActive(pathname, href, resolvedActive);
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  className={cn(
+                    'whitespace-nowrap rounded-md px-2 py-1.5 text-sm font-medium text-white/90 transition-colors hover:bg-white/5 hover:text-white lg:px-2.5',
+                    active && 'bg-white/10 text-green-400',
+                  )}
+                  aria-current={active ? 'page' : undefined}
+                >
+                  {label}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
 
+        <div className="relative z-10 ml-auto flex shrink-0 items-center gap-x-1 bg-nav-bg sm:gap-x-3">
           {user ? (
             <>
               {isAdminUser && (

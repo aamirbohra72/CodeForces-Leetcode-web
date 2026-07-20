@@ -237,18 +237,35 @@ export const submissionController = {
         return;
       }
 
-      const isContestSubmission = challenge.contest.status === 'LIVE';
-      if (isContestSubmission) {
-        const now = new Date();
-        if (now < challenge.contest.startTime || now > challenge.contest.endTime) {
-          // Practice contest is LIVE long-term; still allow if within window.
-          // For true contests outside window, block.
-          if (!challenge.slug) {
-            res.status(400).json({ error: 'Contest is not currently active' });
-            return;
-          }
+      const contest = challenge.contest;
+      const now = new Date();
+      const isPractice = contest.kind === 'PRACTICE';
+      const isWithinWindow = now >= contest.startTime && now <= contest.endTime;
+
+      // Non-practice contests: must be registered and within the live window.
+      if (!isPractice) {
+        if (!isWithinWindow) {
+          res.status(400).json({ error: 'Contest is not currently active' });
+          return;
+        }
+
+        const registration = await prisma.contestRegistration.findUnique({
+          where: {
+            userId_contestId: {
+              userId: req.user.userId,
+              contestId: contest.id,
+            },
+          },
+        });
+        if (!registration) {
+          res.status(403).json({
+            error: 'Register for this contest before submitting',
+          });
+          return;
         }
       }
+
+      const isContestSubmission = !isPractice && isWithinWindow;
 
       const submission = await prisma.submission.create({
         data: {

@@ -1,7 +1,13 @@
-import type { UserRole as DBUserRole, ContestStatus as DBContestStatus, SubmissionStatus as DBSubmissionStatus } from '@codeforces/db';
+import type {
+  UserRole as DBUserRole,
+  ContestStatus as DBContestStatus,
+  ContestKind as DBContestKind,
+  SubmissionStatus as DBSubmissionStatus,
+} from '@codeforces/db';
 
 export type UserRole = DBUserRole;
 export type ContestStatus = DBContestStatus;
+export type ContestKind = DBContestKind;
 export type SubmissionStatus = DBSubmissionStatus;
 
 export interface User {
@@ -15,13 +21,46 @@ export interface User {
 
 export interface Contest {
   id: string;
+  slug?: string | null;
   name: string;
   description: string | null;
-  startTime: Date;
-  endTime: Date;
+  startTime: Date | string;
+  endTime: Date | string;
   status: ContestStatus;
-  createdAt: Date;
-  updatedAt: Date;
+  /** Wall-clock status derived from start/end (preferred over stored status) */
+  effectiveStatus?: ContestStatus;
+  kind?: ContestKind;
+  isPublished?: boolean;
+  problemCount?: number;
+  participantCount?: number;
+  /** Present when the request is authenticated */
+  isRegistered?: boolean;
+  /** Milliseconds until start (0 if already started) */
+  startsInMs?: number;
+  /** Milliseconds until end (0 if already ended) */
+  endsInMs?: number;
+  /** Contest duration in milliseconds */
+  durationMs?: number;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
+export interface ContestRegistration {
+  id: string;
+  userId: string;
+  contestId: string;
+  registeredAt: Date | string;
+}
+
+export interface ContestMeResponse {
+  contestId: string;
+  registered: boolean;
+  registeredAt: Date | string | null;
+  effectiveStatus: ContestStatus;
+  kind: ContestKind;
+  canRegister: boolean;
+  canUnregister: boolean;
+  canSubmit: boolean;
 }
 
 export interface Challenge {

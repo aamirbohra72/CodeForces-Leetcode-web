@@ -1,9 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import { notFound } from 'next/navigation';
 import { useParams } from 'next/navigation';
 import { Navbar } from '@/components/Navbar';
 import { getUser } from '@/lib/auth';
+import { isReservedUsername } from '@/lib/reservedPaths';
 
 // Mock data - in production, fetch from API
 const mockStreakData = {
@@ -47,6 +49,9 @@ const mockStats = {
 export default function ProfilePage() {
   const params = useParams();
   const username = params.username as string;
+  if (isReservedUsername(username)) {
+    notFound();
+  }
   const currentUser = getUser();
   const isOwnProfile = currentUser?.username === username;
 
