@@ -28,6 +28,7 @@ const sidebarItems: SidebarItem[] = [
   { label: 'Placement Support', href: '/placement', icon: '💼' },
   { label: 'Write a Blog', href: '/blog/write', icon: '✏️' },
   { label: 'DSA Sheet', href: '/dsa-sheet', icon: '📋' },
+  { label: 'Visualizer', href: '/visualizer', icon: '▶️' },
   { label: 'Roadmaps', href: '/roadmaps', icon: '🗺️' },
   { label: 'Project Ideas', href: '/projects', icon: '💡' },
 ];
