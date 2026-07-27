@@ -61,38 +61,62 @@ type MistralChatResponse = {
 };
 
 export async function mistralChatJson(system: string, user: string): Promise<string> {
-  const apiKey = getApiKey();
-  const body: Record<string, unknown> = {
-    model: chatModel(),
-    temperature: 0.3,
-    messages: [
-      { role: 'system', content: system },
-      { role: 'user', content: user },
-    ],
-    response_format: { type: 'json_object' },
-  };
+  return mistralChat(system, user, { jsonMode: true });
+}
 
-  let res = await fetch(`${MISTRAL_API_BASE}/chat/completions`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  });
+const MISTRAL_FETCH_TIMEOUT_MS = 90_000;
 
-  let data = (await res.json()) as MistralChatResponse & { error?: { message?: string } };
-
-  if (!res.ok && data.error?.message?.toLowerCase().includes('response_format')) {
-    delete body.response_format;
-    res = await fetch(`${MISTRAL_API_BASE}/chat/completions`, {
+async function fetchMistral(
+  body: Record<string, unknown>,
+  apiKey: string,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), MISTRAL_FETCH_TIMEOUT_MS);
+  try {
+    return await fetch(`${MISTRAL_API_BASE}/chat/completions`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(body),
+      signal: controller.signal,
     });
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new Error(`Mistral request timed out after ${MISTRAL_FETCH_TIMEOUT_MS / 1000}s`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export async function mistralChat(
+  system: string,
+  user: string,
+  options?: { model?: string; jsonMode?: boolean },
+): Promise<string> {
+  const apiKey = getApiKey();
+  const body: Record<string, unknown> = {
+    model: options?.model ?? chatModel(),
+    temperature: 0.3,
+    messages: [
+      { role: 'system', content: system },
+      { role: 'user', content: user },
+    ],
+  };
+
+  if (options?.jsonMode) {
+    body.response_format = { type: 'json_object' };
+  }
+
+  let res = await fetchMistral(body, apiKey);
+  let data = (await res.json()) as MistralChatResponse & { error?: { message?: string } };
+
+  if (!res.ok && options?.jsonMode && data.error?.message?.toLowerCase().includes('response_format')) {
+    delete body.response_format;
+    res = await fetchMistral(body, apiKey);
     data = (await res.json()) as MistralChatResponse & { error?: { message?: string } };
   }
 

@@ -67,6 +67,8 @@ model User {
   leaderboardEntries LeaderboardEntry[]
   interviewSessions  InterviewSession[]
   contestRegistrations ContestRegistration[]
+  courses            Course[]
+  topicProgress      Progress[]
 
   @@index([email])
   @@index([username])
@@ -262,4 +264,75 @@ model InterviewTurn {
 
   @@unique([sessionId, order])
   @@index([sessionId])
+}
+
+model Course {
+  id            String   @id @default(cuid())
+  title         String
+  description   String
+  sourceType    String
+  sourceContent String   @db.Text
+  createdBy     String
+  createdAt     DateTime @default(now())
+
+  creator User   @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  units   Unit[]
+
+  @@index([createdBy])
+}
+
+model Unit {
+  id               String   @id @default(cuid())
+  courseId         String
+  course           Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  title            String
+  description      String   @db.Text
+  order            Int
+  estimatedMinutes Int
+  tags             String[]
+  topics           Topic[]
+
+  @@index([courseId, order])
+}
+
+model Topic {
+  id               String   @id @default(cuid())
+  unitId           String
+  unit             Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  title            String
+  type             String
+  order            Int
+  estimatedMinutes Int
+  content          String   @db.Text
+  mcqs             MCQ[]
+  progress         Progress[]
+
+  @@index([unitId, order])
+}
+
+model MCQ {
+  id           String @id @default(cuid())
+  topicId      String
+  topic        Topic  @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  question     String @db.Text
+  options      String[]
+  correctIndex Int
+  explanation  String @db.Text
+
+  @@index([topicId])
+}
+
+model Progress {
+  id            String   @id @default(cuid())
+  userId        String
+  topicId       String
+  completed     Boolean  @default(false)
+  score         Int?
+  lastAttemptAt DateTime @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topic Topic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, topicId])
+  @@index([userId])
 }

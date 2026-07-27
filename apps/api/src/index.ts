@@ -12,6 +12,7 @@ import { executionRoutes } from './routes/execution';
 import { interviewRoutes } from './routes/interview';
 import { courseRoutes } from './routes/courses';
 import { careersRoutes } from './routes/careers';
+import { progressRoutes } from './routes/progress';
 import { connectRedis, disconnectRedis } from './services/redisService';
 import {
   assertEmailConfigForRuntime,
@@ -34,7 +35,7 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '2mb' }));
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -45,6 +46,7 @@ app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/execute', executionRoutes);
 app.use('/api/interview', interviewRoutes);
 app.use('/api/courses', courseRoutes);
+app.use('/api/progress', progressRoutes);
 app.use('/api/careers', careersRoutes);
 
 // Health check
@@ -68,7 +70,7 @@ process.on('SIGTERM', async () => {
   process.exit(0);
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`🚀 API server running on http://localhost:${PORT}`);
   const mode = getEmailDeliveryMode();
   console.log(`📬 Email delivery mode: ${mode}`);
@@ -81,4 +83,6 @@ app.listen(PORT, () => {
     console.error('[MAIL] SMTP verify failed — outgoing mail may not work:', err.message);
   });
 });
+
+server.setTimeout(10 * 60 * 1000);
 

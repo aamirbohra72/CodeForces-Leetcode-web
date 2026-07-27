@@ -152,6 +152,30 @@ export default function LearnPage() {
             ))}
           </div>
 
+          {activeFilter === 'bundles' && (
+            <Link
+              href="/learn/create"
+              style={{
+                display: 'block',
+                marginBottom: '2rem',
+                padding: '1.5rem',
+                borderRadius: '12px',
+                border: '1px dashed #22c55e',
+                background: 'rgba(34, 197, 94, 0.08)',
+                textDecoration: 'none',
+                color: 'inherit',
+              }}
+            >
+              <h2 style={{ fontSize: '1.25rem', marginBottom: '0.5rem', color: '#22c55e' }}>
+                + Generate a custom course with AI
+              </h2>
+              <p style={{ color: '#b0b0b0', fontSize: '0.95rem' }}>
+                Paste notes, upload a PDF, or enter a topic — get a full notebook with lessons and
+                quizzes.
+              </p>
+            </Link>
+          )}
+
           {/* Course Grid */}
           <div
             style={{
