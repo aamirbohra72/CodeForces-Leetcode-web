@@ -1,7 +1,7 @@
 import type { VisualScript } from '@/types/visual-script';
 
 export const encapsulationScript: VisualScript = {
-  id: 'lld-encapsulation-withdraw',
+  id: 'lld-oop-encapsulation',
   type: 'lld',
   title: 'Encapsulation',
   meta: {

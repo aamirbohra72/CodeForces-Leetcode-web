@@ -7,6 +7,6 @@ export { CodePanel } from './CodePanel';
 export { StatePanel } from './StatePanel';
 export { CaptionBar } from './CaptionBar';
 export { PlayerControls } from './PlayerControls';
-export { TopicNav } from './TopicNav';
+export { LldPatternNav } from './LldPatternNav';
 export { ApproachTabs } from './ApproachTabs';
 export { SolutionPanel } from './SolutionPanel';

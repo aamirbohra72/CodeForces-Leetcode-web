@@ -16,6 +16,18 @@ import { StackDiagram } from './StackDiagram';
 import { StringDiagram } from './StringDiagram';
 import { TreeDiagram } from './TreeDiagram';
 import { WindowDequeDiagram } from './WindowDequeDiagram';
+import { UmlClassDiagram } from './UmlClassDiagram';
+import { FsmDiagram } from './FsmDiagram';
+import { SingletonDiagram } from './SingletonDiagram';
+import { LayeredDiagram } from './LayeredDiagram';
+import { FanOutDiagram } from './FanOutDiagram';
+import { CreationFlowDiagram } from './CreationFlowDiagram';
+import { DomainGraphDiagram } from './DomainGraphDiagram';
+import { PrincipleCompareDiagram } from './PrincipleCompareDiagram';
+import { AccessChainDiagram } from './AccessChainDiagram';
+import { FlyweightDiagram } from './FlyweightDiagram';
+import { TemplateMethodDiagram } from './TemplateMethodDiagram';
+import { IteratorDiagram } from './IteratorDiagram';
 import { cn } from '@/lib/cn';
 
 type DiagramRendererProps = {
@@ -35,6 +47,30 @@ export function DiagramRenderer({ step, className }: DiagramRendererProps) {
     >
       {diagram.kind === 'sequence' ? (
         <SequenceDiagram diagram={diagram} />
+      ) : diagram.kind === 'umlClass' ? (
+        <UmlClassDiagram diagram={diagram} />
+      ) : diagram.kind === 'fsm' ? (
+        <FsmDiagram diagram={diagram} />
+      ) : diagram.kind === 'singleton' ? (
+        <SingletonDiagram diagram={diagram} />
+      ) : diagram.kind === 'layered' ? (
+        <LayeredDiagram diagram={diagram} />
+      ) : diagram.kind === 'fanOut' ? (
+        <FanOutDiagram diagram={diagram} />
+      ) : diagram.kind === 'creationFlow' ? (
+        <CreationFlowDiagram diagram={diagram} />
+      ) : diagram.kind === 'domainGraph' ? (
+        <DomainGraphDiagram diagram={diagram} />
+      ) : diagram.kind === 'principleCompare' ? (
+        <PrincipleCompareDiagram diagram={diagram} />
+      ) : diagram.kind === 'accessChain' ? (
+        <AccessChainDiagram diagram={diagram} />
+      ) : diagram.kind === 'flyweight' ? (
+        <FlyweightDiagram diagram={diagram} />
+      ) : diagram.kind === 'templateMethod' ? (
+        <TemplateMethodDiagram diagram={diagram} />
+      ) : diagram.kind === 'iterator' ? (
+        <IteratorDiagram diagram={diagram} />
       ) : diagram.kind === 'elevation' ? (
         <ElevationDiagram diagram={diagram} />
       ) : diagram.kind === 'container' ? (

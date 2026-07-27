@@ -1,10 +1,11 @@
 'use client';
 
 import type { DsaPattern } from '@/data/dsa-pattern-catalog';
+import type { LldPattern } from '@/data/lld-pattern-catalog';
 import { cn } from '@/lib/cn';
 
 type PatternPlaceholderProps = {
-  pattern: DsaPattern;
+  pattern: DsaPattern | LldPattern;
   className?: string;
 };
 
@@ -27,14 +28,20 @@ export function PatternPlaceholder({ pattern, className }: PatternPlaceholderPro
           {pattern.categoryTitle}
         </p>
         <h2 className="text-2xl font-semibold text-white">{pattern.title}</h2>
-        <span
-          className={cn(
-            'inline-block rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase',
-            DIFFICULTY_STYLES[pattern.difficulty],
-          )}
-        >
-          {pattern.difficulty}
-        </span>
+        {'difficulty' in pattern ? (
+          <span
+            className={cn(
+              'inline-block rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase',
+              DIFFICULTY_STYLES[pattern.difficulty],
+            )}
+          >
+            {pattern.difficulty}
+          </span>
+        ) : (
+          <span className="inline-block rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-emerald-300">
+            Concept
+          </span>
+        )}
         <p className="text-sm leading-relaxed text-white/50">
           Step-by-step animation for this pattern is on the way. Pick a problem marked with{' '}
           <span className="text-emerald-400">▶</span> in the sidebar to watch a live walkthrough.

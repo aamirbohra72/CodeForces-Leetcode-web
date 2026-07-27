@@ -8,6 +8,12 @@ import {
   patternIdForScript,
   type DsaPattern,
 } from '@/data/dsa-pattern-catalog';
+import {
+  getDefaultLldPatternId,
+  getLldPattern,
+  patternIdForLldScript,
+  type LldPattern,
+} from '@/data/lld-pattern-catalog';
 import { useNarration } from '@/hooks/useNarration';
 import { useStepPlayer } from '@/hooks/useStepPlayer';
 import type { VisualScript } from '@/types/visual-script';
@@ -19,13 +25,12 @@ import { ApproachTabs } from './ApproachTabs';
 import { CaptionBar } from './CaptionBar';
 import { DiagramRenderer } from './DiagramRenderer';
 import { DsaPatternNav } from './DsaPatternNav';
+import { LldPatternNav } from './LldPatternNav';
 import { PlayerControls } from './PlayerControls';
 import { SolutionPanel } from './SolutionPanel';
-import { TopicNav } from './TopicNav';
 import { PatternPlaceholder } from './PatternPlaceholder';
 import { cn } from '@/lib/cn';
 import type { PlayableTrackId } from '@/data/visualizer-tracks';
-import { visualScripts } from '@/data/visual-scripts';
 
 type VisualizerProps = {
   track: PlayableTrackId;
@@ -223,8 +228,8 @@ function DsaVisualizer({
   );
   const [solutionHidden, setSolutionHidden] = useState(false);
 
-  const pattern = getDsaPattern(patternId) ?? getDsaPattern(getDefaultDsaPatternId())!;
-  const script = getScriptForPattern(pattern);
+  const pattern = getDsaPattern(patternId) ?? getDsaPattern(getDefaultDsaPatternId());
+  const script = pattern ? getScriptForPattern(pattern) : undefined;
 
   const handleSelectPattern = (next: DsaPattern) => {
     setPatternId(next.id);
@@ -247,8 +252,12 @@ function DsaVisualizer({
             solutionHidden={solutionHidden}
             onSolutionHiddenChange={setSolutionHidden}
           />
-        ) : (
+        ) : pattern ? (
           <PatternPlaceholder pattern={pattern} />
+        ) : (
+          <div className="flex flex-1 items-center justify-center text-sm text-white/45">
+            Pattern not found
+          </div>
         )}
       </div>
     </div>
@@ -257,25 +266,30 @@ function DsaVisualizer({
 
 function LldVisualizer({
   initialScriptId,
+  initialPatternId,
   className,
 }: {
   initialScriptId?: string;
+  initialPatternId?: string;
   className?: string;
 }) {
-  const trackScripts = visualScripts.filter((s) => s.type === 'lld');
-  const defaultScript = trackScripts[0];
-
-  const [script, setScript] = useState<VisualScript>(() => {
+  const [patternId, setPatternId] = useState(() => {
+    if (initialPatternId) return initialPatternId;
     if (initialScriptId) {
-      const found = trackScripts.find((s) => s.id === initialScriptId);
-      if (found) return found;
+      const fromScript = patternIdForLldScript(initialScriptId);
+      if (fromScript) return fromScript;
     }
-    return defaultScript ?? visualScripts[0];
+    return getDefaultLldPatternId();
   });
   const [solutionHidden, setSolutionHidden] = useState(false);
 
-  const handleSelectScript = (next: VisualScript) => {
-    setScript(next);
+  const pattern =
+    getLldPattern(patternId) ??
+    getLldPattern(getDefaultLldPatternId());
+  const script = pattern ? getScriptForPattern(pattern) : undefined;
+
+  const handleSelectPattern = (next: LldPattern) => {
+    setPatternId(next.id);
     setSolutionHidden(false);
   };
 
@@ -286,14 +300,22 @@ function LldVisualizer({
         className,
       )}
     >
-      <TopicNav track="lld" activeId={script.id} onSelect={handleSelectScript} />
+      <LldPatternNav activePatternId={patternId} onSelect={handleSelectPattern} />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <ScriptPlayer
-          key={script.id}
-          script={script}
-          solutionHidden={solutionHidden}
-          onSolutionHiddenChange={setSolutionHidden}
-        />
+        {script ? (
+          <ScriptPlayer
+            key={script.id}
+            script={script}
+            solutionHidden={solutionHidden}
+            onSolutionHiddenChange={setSolutionHidden}
+          />
+        ) : pattern ? (
+          <PatternPlaceholder pattern={pattern} />
+        ) : (
+          <div className="flex flex-1 items-center justify-center text-sm text-white/45">
+            Pattern not found
+          </div>
+        )}
       </div>
     </div>
   );
@@ -314,5 +336,5 @@ export function Visualizer({
       />
     );
   }
-  return <LldVisualizer initialScriptId={initialScriptId} className={className} />;
+  return <LldVisualizer initialScriptId={initialScriptId} initialPatternId={initialPatternId} className={className} />;
 }
