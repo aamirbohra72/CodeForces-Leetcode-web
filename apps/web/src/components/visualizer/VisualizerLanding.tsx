@@ -176,7 +176,8 @@ export function VisualizerLanding() {
             </h1>
             <p className="max-w-xl text-base leading-relaxed text-white/55 sm:text-lg">
               Every pattern, stepped through one frame at a time — pointers gliding,
-              trees recursing, DP tables filling in. Press play and watch the idea unfold.
+              trees recursing, DP tables filling in. Browse 180+ interview patterns and
+              press play to watch the idea unfold.
             </p>
             <div className="flex flex-wrap gap-3">
               <Link

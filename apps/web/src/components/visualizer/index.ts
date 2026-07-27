@@ -1,5 +1,7 @@
 export { Visualizer } from './Visualizer';
 export { VisualizerLanding } from './VisualizerLanding';
+export { DsaPatternNav } from './DsaPatternNav';
+export { PatternPlaceholder } from './PatternPlaceholder';
 export { DiagramRenderer } from './DiagramRenderer';
 export { CodePanel } from './CodePanel';
 export { StatePanel } from './StatePanel';

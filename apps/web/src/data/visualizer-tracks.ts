@@ -13,6 +13,10 @@ export type VisualizerTrack = {
   href?: string;
 };
 
+import { getDsaPatternStats } from './dsa-pattern-catalog';
+
+const dsaStats = getDsaPatternStats();
+
 export const visualizerTracks: VisualizerTrack[] = [
   {
     id: 'dsa',
@@ -29,9 +33,13 @@ export const visualizerTracks: VisualizerTrack[] = [
       'Linked List',
       'Heap',
       'Binary Search',
-      'Depth-First Search',
+      'Trees',
+      'Graphs',
+      'Dynamic Programming',
+      'Backtracking',
+      'Greedy',
     ],
-    stats: '2 problems · growing',
+    stats: `${dsaStats.animated} animated · ${dsaStats.total} patterns`,
     href: '/visualizer/dsa',
   },
   {

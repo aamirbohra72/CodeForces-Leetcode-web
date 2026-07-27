@@ -1,7 +1,13 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { visualScripts } from '@/data/visual-scripts';
+import { useEffect, useMemo, useState } from 'react';
+import { getScriptForPattern } from '@/data/visual-scripts';
+import {
+  getDsaPattern,
+  getDefaultDsaPatternId,
+  patternIdForScript,
+  type DsaPattern,
+} from '@/data/dsa-pattern-catalog';
 import { useNarration } from '@/hooks/useNarration';
 import { useStepPlayer } from '@/hooks/useStepPlayer';
 import type { VisualScript } from '@/types/visual-script';
@@ -12,28 +18,31 @@ import {
 import { ApproachTabs } from './ApproachTabs';
 import { CaptionBar } from './CaptionBar';
 import { DiagramRenderer } from './DiagramRenderer';
+import { DsaPatternNav } from './DsaPatternNav';
 import { PlayerControls } from './PlayerControls';
 import { SolutionPanel } from './SolutionPanel';
 import { TopicNav } from './TopicNav';
+import { PatternPlaceholder } from './PatternPlaceholder';
 import { cn } from '@/lib/cn';
-
 import type { PlayableTrackId } from '@/data/visualizer-tracks';
+import { visualScripts } from '@/data/visual-scripts';
 
 type VisualizerProps = {
   track: PlayableTrackId;
   initialScriptId?: string;
+  initialPatternId?: string;
   className?: string;
 };
 
-function DifficultyBadge({ level }: { level: NonNullable<VisualScript['meta']['difficulty']> }) {
+function DifficultyBadge({ level }: { level: string }) {
   const styles =
-    level === 'EASY'
+    level === 'EASY' || level === 'Easy'
       ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
-      : level === 'MEDIUM'
+      : level === 'MEDIUM' || level === 'Medium'
         ? 'border-amber-500/30 bg-amber-500/10 text-amber-300'
         : 'border-rose-500/30 bg-rose-500/10 text-rose-300';
   return (
-    <span className={cn('rounded-md border px-1.5 py-0.5 text-[10px] font-semibold', styles)}>
+    <span className={cn('rounded-md border px-1.5 py-0.5 text-[10px] font-semibold uppercase', styles)}>
       {level}
     </span>
   );
@@ -70,30 +79,25 @@ function HideSolutionToggle({
   );
 }
 
-export function Visualizer({
-  track,
-  initialScriptId,
-  className,
-}: VisualizerProps) {
-  const trackScripts = visualScripts.filter((s) => s.type === track);
-  const defaultScript = trackScripts[0];
-
-  const [script, setScript] = useState<VisualScript>(() => {
-    if (initialScriptId) {
-      const found = trackScripts.find((s) => s.id === initialScriptId);
-      if (found) return found;
-    }
-    return defaultScript ?? visualScripts[0];
-  });
+function ScriptPlayer({
+  script,
+  solutionHidden,
+  onSolutionHiddenChange,
+}: {
+  script: VisualScript;
+  solutionHidden: boolean;
+  onSolutionHiddenChange: (hidden: boolean) => void;
+}) {
   const [approachId, setApproachId] = useState(() => getDefaultApproach(script).id);
-  const [solutionHidden, setSolutionHidden] = useState(false);
   const [trackedScriptId, setTrackedScriptId] = useState(script.id);
 
-  if (script.id !== trackedScriptId) {
-    setTrackedScriptId(script.id);
-    setApproachId(getDefaultApproach(script).id);
-    setSolutionHidden(false);
-  }
+  useEffect(() => {
+    if (script.id !== trackedScriptId) {
+      setTrackedScriptId(script.id);
+      setApproachId(getDefaultApproach(script).id);
+      onSolutionHiddenChange(false);
+    }
+  }, [script, trackedScriptId, onSolutionHiddenChange]);
 
   const approach = useMemo(
     () => script.approaches.find((a) => a.id === approachId) ?? getDefaultApproach(script),
@@ -115,14 +119,115 @@ export function Visualizer({
 
   const { meta } = script;
 
-  const handleSelectScript = (next: VisualScript) => {
-    setScript(next);
-    setApproachId(getDefaultApproach(next).id);
-    setSolutionHidden(false);
-  };
+  return (
+    <>
+      <header className="shrink-0 border-b border-[#3a3a3a] px-3 py-3 sm:px-5 sm:py-4">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0 space-y-1">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/40">
+              {meta.eyebrow}
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-xl font-semibold tracking-tight text-white sm:text-2xl">
+                {script.title}
+              </h1>
+              {meta.leetcode ? (
+                <span className="rounded-md border border-[#3a3a3a] px-1.5 py-0.5 text-[10px] text-white/50">
+                  {meta.leetcode}
+                </span>
+              ) : null}
+              {meta.difficulty ? <DifficultyBadge level={meta.difficulty} /> : null}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs tabular-nums text-white/40">
+              step {player.currentStepIndex + 1} / {player.stepCount}
+            </span>
+            <HideSolutionToggle
+              hidden={solutionHidden}
+              onToggle={() => onSolutionHiddenChange(!solutionHidden)}
+            />
+          </div>
+        </div>
 
-  const handleSelectApproach = (id: string) => {
-    setApproachId(id);
+        <div className="mt-2.5 max-w-3xl rounded-xl border border-[#3a3a3a] bg-[#141414] px-3 py-2.5">
+          <p className="text-[13px] leading-relaxed text-white/65">{meta.description}</p>
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            {meta.companies.map((c) => (
+              <span
+                key={c}
+                className="rounded-md border border-[#3a3a3a] bg-[#1a1a1a] px-2 py-0.5 text-[11px] text-white/45"
+              >
+                {c}
+              </span>
+            ))}
+          </div>
+          <ApproachTabs
+            approaches={script.approaches}
+            activeId={approach.id}
+            onSelect={(id) => {
+              setApproachId(id);
+              onSolutionHiddenChange(false);
+            }}
+            className="mt-3 border-t border-[#3a3a3a] pt-3"
+          />
+        </div>
+      </header>
+
+      <div className="grid min-h-0 flex-1 gap-2 overflow-hidden p-3 sm:gap-3 sm:p-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(240px,0.85fr)]">
+        <DiagramRenderer step={player.currentStep} className="min-h-[160px]" />
+        <SolutionPanel
+          approach={approach}
+          step={player.currentStep}
+          stepIndex={player.currentStepIndex}
+          stepCount={player.stepCount}
+          solutionHidden={solutionHidden}
+          onRevealSolution={() => onSolutionHiddenChange(false)}
+        />
+      </div>
+
+      <div className="shrink-0 px-4 pb-0 md:px-5">
+        <CaptionBar
+          caption={caption}
+          loading={loading}
+          activeLine={player.currentStep.activeLine}
+          className="mb-3"
+        />
+      </div>
+      <PlayerControls
+        currentStepIndex={player.currentStepIndex}
+        stepCount={player.stepCount}
+        isPlaying={player.isPlaying}
+        speed={player.speed}
+        onPlay={player.play}
+        onPause={player.pause}
+        onNext={player.next}
+        onPrev={player.prev}
+        onSeek={player.seek}
+        onReset={player.reset}
+        onSpeedChange={player.setSpeed}
+      />
+    </>
+  );
+}
+
+function DsaVisualizer({
+  initialPatternId,
+  className,
+}: {
+  initialPatternId?: string;
+  className?: string;
+}) {
+  const [patternId, setPatternId] = useState(
+    () => initialPatternId ?? getDefaultDsaPatternId(),
+  );
+  const [solutionHidden, setSolutionHidden] = useState(false);
+
+  const pattern = getDsaPattern(patternId) ?? getDsaPattern(getDefaultDsaPatternId())!;
+  const script = getScriptForPattern(pattern);
+
+  const handleSelectPattern = (next: DsaPattern) => {
+    setPatternId(next.id);
     setSolutionHidden(false);
   };
 
@@ -133,88 +238,81 @@ export function Visualizer({
         className,
       )}
     >
-      <TopicNav track={track} activeId={script.id} onSelect={handleSelectScript} />
-
+      <DsaPatternNav activePatternId={patternId} onSelect={handleSelectPattern} />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="shrink-0 border-b border-[#3a3a3a] px-3 py-3 sm:px-5 sm:py-4">
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <div className="min-w-0 space-y-1">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/40">
-                {meta.eyebrow}
-              </p>
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-xl font-semibold tracking-tight text-white sm:text-2xl">
-                  {script.title}
-                </h1>
-                {meta.leetcode ? (
-                  <span className="rounded-md border border-[#3a3a3a] px-1.5 py-0.5 text-[10px] text-white/50">
-                    {meta.leetcode}
-                  </span>
-                ) : null}
-                {meta.difficulty ? <DifficultyBadge level={meta.difficulty} /> : null}
-              </div>
-            </div>
-            <HideSolutionToggle
-              hidden={solutionHidden}
-              onToggle={() => setSolutionHidden((v) => !v)}
-            />
-          </div>
-
-          <div className="mt-2.5 max-w-3xl rounded-xl border border-[#3a3a3a] bg-[#141414] px-3 py-2.5">
-            <p className="text-[13px] leading-relaxed text-white/65">{meta.description}</p>
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              {meta.companies.map((c) => (
-                <span
-                  key={c}
-                  className="rounded-md border border-[#3a3a3a] bg-[#1a1a1a] px-2 py-0.5 text-[11px] text-white/45"
-                >
-                  {c}
-                </span>
-              ))}
-            </div>
-            <ApproachTabs
-              approaches={script.approaches}
-              activeId={approach.id}
-              onSelect={handleSelectApproach}
-              className="mt-3 border-t border-[#3a3a3a] pt-3"
-            />
-          </div>
-        </header>
-
-        <div className="grid min-h-0 flex-1 gap-2 overflow-hidden p-3 sm:gap-3 sm:p-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(240px,0.85fr)]">
-          <DiagramRenderer step={player.currentStep} className="min-h-[160px]" />
-          <SolutionPanel
-            approach={approach}
-            step={player.currentStep}
-            stepIndex={player.currentStepIndex}
-            stepCount={player.stepCount}
+        {script ? (
+          <ScriptPlayer
+            key={script.id}
+            script={script}
             solutionHidden={solutionHidden}
-            onRevealSolution={() => setSolutionHidden(false)}
+            onSolutionHiddenChange={setSolutionHidden}
           />
-        </div>
+        ) : (
+          <PatternPlaceholder pattern={pattern} />
+        )}
+      </div>
+    </div>
+  );
+}
 
-        <div className="shrink-0 space-y-0 px-4 pb-0 md:px-5">
-          <CaptionBar
-            caption={caption}
-            loading={loading}
-            activeLine={player.currentStep.activeLine}
-            className="mb-3"
-          />
-        </div>
-        <PlayerControls
-          currentStepIndex={player.currentStepIndex}
-          stepCount={player.stepCount}
-          isPlaying={player.isPlaying}
-          speed={player.speed}
-          onPlay={player.play}
-          onPause={player.pause}
-          onNext={player.next}
-          onPrev={player.prev}
-          onSeek={player.seek}
-          onReset={player.reset}
-          onSpeedChange={player.setSpeed}
+function LldVisualizer({
+  initialScriptId,
+  className,
+}: {
+  initialScriptId?: string;
+  className?: string;
+}) {
+  const trackScripts = visualScripts.filter((s) => s.type === 'lld');
+  const defaultScript = trackScripts[0];
+
+  const [script, setScript] = useState<VisualScript>(() => {
+    if (initialScriptId) {
+      const found = trackScripts.find((s) => s.id === initialScriptId);
+      if (found) return found;
+    }
+    return defaultScript ?? visualScripts[0];
+  });
+  const [solutionHidden, setSolutionHidden] = useState(false);
+
+  const handleSelectScript = (next: VisualScript) => {
+    setScript(next);
+    setSolutionHidden(false);
+  };
+
+  return (
+    <div
+      className={cn(
+        'flex h-full min-h-0 w-full flex-row overflow-hidden bg-[#1a1a1a] text-white',
+        className,
+      )}
+    >
+      <TopicNav track="lld" activeId={script.id} onSelect={handleSelectScript} />
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <ScriptPlayer
+          key={script.id}
+          script={script}
+          solutionHidden={solutionHidden}
+          onSolutionHiddenChange={setSolutionHidden}
         />
       </div>
     </div>
   );
+}
+
+export function Visualizer({
+  track,
+  initialScriptId,
+  initialPatternId,
+  className,
+}: VisualizerProps) {
+  if (track === 'dsa') {
+    const fromScript = initialScriptId ? patternIdForScript(initialScriptId) : undefined;
+    return (
+      <DsaVisualizer
+        initialPatternId={initialPatternId ?? fromScript}
+        className={className}
+      />
+    );
+  }
+  return <LldVisualizer initialScriptId={initialScriptId} className={className} />;
 }

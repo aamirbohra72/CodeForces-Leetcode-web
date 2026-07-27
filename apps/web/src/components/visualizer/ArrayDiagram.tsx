@@ -24,13 +24,17 @@ function pointerColor(p: ArrayPointer, indexInList: number) {
 }
 
 export function ArrayDiagram({ diagram }: ArrayDiagramProps) {
-  const { cells, pointers, highlightIndices = [] } = diagram;
+  const { cells, pointers, highlightIndices = [], window } = diagram;
   const highlight = new Set(highlightIndices);
   const width = Math.max(340, LEFT_PAD * 2 + cells.length * (CELL_W + CELL_GAP));
   const height = 200;
 
   const cellX = (index: number) => LEFT_PAD + index * (CELL_W + CELL_GAP);
   const cellCenterX = (index: number) => cellX(index) + CELL_W / 2;
+
+  const hasWindow = window != null;
+  const wStart = hasWindow ? Math.min(window.start, window.end) : 0;
+  const wEnd = hasWindow ? Math.max(window.start, window.end) : 0;
 
   const colorAtIndex = (index: number) => {
     const ptr = pointers.find((p) => p.index === index);
@@ -53,6 +57,20 @@ export function ArrayDiagram({ diagram }: ArrayDiagramProps) {
       role="img"
       aria-label="Array diagram"
     >
+      {hasWindow ? (
+        <rect
+          x={cellX(wStart) - 4}
+          y={TOP - 10}
+          width={cellX(wEnd) - cellX(wStart) + CELL_W + 8}
+          height={CELL_H + 16}
+          rx={10}
+          fill="rgba(34,197,94,0.1)"
+          stroke="rgba(34,197,94,0.35)"
+          strokeWidth={1.5}
+          style={{ transition: 'x 220ms ease, width 220ms ease' }}
+        />
+      ) : null}
+
       {cells.map((cell) => {
         const x = cellX(cell.index);
         const isHot = highlight.has(cell.index);
