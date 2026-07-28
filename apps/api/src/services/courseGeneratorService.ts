@@ -290,6 +290,42 @@ function sanitizeCourse(
   };
 }
 
+export type GeneratedCourseSummary = {
+  id: string;
+  title: string;
+  description: string;
+  sourceType: string;
+  createdAt: Date;
+  unitCount: number;
+  topicCount: number;
+  estimatedMinutes: number;
+};
+
+export async function listGeneratedCoursesForUser(userId: string): Promise<GeneratedCourseSummary[]> {
+  const courses = await prisma.course.findMany({
+    where: { createdBy: userId },
+    orderBy: { createdAt: 'desc' },
+    include: {
+      units: {
+        include: {
+          _count: { select: { topics: true } },
+        },
+      },
+    },
+  });
+
+  return courses.map((course) => ({
+    id: course.id,
+    title: course.title,
+    description: course.description,
+    sourceType: course.sourceType,
+    createdAt: course.createdAt,
+    unitCount: course.units.length,
+    topicCount: course.units.reduce((sum, u) => sum + u._count.topics, 0),
+    estimatedMinutes: course.units.reduce((sum, u) => sum + u.estimatedMinutes, 0),
+  }));
+}
+
 export async function getCourseById(id: string, userId?: string): Promise<SanitizedCourse | null> {
   const course = await prisma.course.findUnique({
     where: { id },

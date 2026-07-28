@@ -11,6 +11,7 @@ import {
 import {
   generateAndPersistCourse,
   getCourseById,
+  listGeneratedCoursesForUser,
   type SourceType,
 } from '../services/courseGeneratorService';
 
@@ -40,6 +41,20 @@ const generateBodySchema = z.object({
 export const courseController = {
   async listLlmCourses(_req: AuthRequest, res: Response): Promise<void> {
     res.json({ courseIds: listLlmCourseIds() });
+  },
+
+  async listMine(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      if (!req.user?.userId) {
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+      }
+      const courses = await listGeneratedCoursesForUser(req.user.userId);
+      res.json({ courses });
+    } catch (err) {
+      const mapped = mapError(err);
+      res.status(mapped.status).json({ error: mapped.message });
+    }
   },
 
   async generate(req: AuthRequest, res: Response): Promise<void> {

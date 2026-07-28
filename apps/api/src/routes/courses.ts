@@ -11,6 +11,10 @@ const upload = multer({
 export const courseRoutes = Router();
 
 courseRoutes.get('/llm-enabled', courseController.listLlmCourses);
+courseRoutes.get('/mine', authenticate, (req, res, next) => {
+  void courseController.listMine(req, res).catch(next);
+});
+
 const GENERATE_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes — LLM course generation is slow
 
 courseRoutes.post('/generate', authenticate, (req, res, next) => {
