@@ -244,7 +244,7 @@ export default function PlacementCareerHubPage() {
             <p className={styles.kicker}>Placement Support</p>
             <h1 className={styles.title}>Career Hub</h1>
             <p className={styles.subtitle}>
-              Explore roles matched to your profile. Job listings are generated dynamically via our LLM API.
+              Explore roles matched to your profile. Listings are fetched live from public job boards.
             </p>
             <div className={styles.mainTabs} role="tablist" aria-label="Career Hub sections">
               {(
@@ -417,7 +417,7 @@ export default function PlacementCareerHubPage() {
                     onClick={refreshHub}
                     disabled={refreshing || loading}
                   >
-                    {refreshing ? 'Refreshing…' : 'Refresh (LLM)'}
+                    {refreshing ? 'Refreshing…' : 'Refresh jobs'}
                   </button>
                 </div>
               </div>
@@ -493,13 +493,23 @@ export default function PlacementCareerHubPage() {
                             <button type="button" className={styles.ghostBtn} onClick={() => toggleSaved(job)}>
                               {saved ? 'Saved' : 'Save'}
                             </button>
+                            {job.applyUrl && (
+                              <a
+                                className={styles.ghostBtn}
+                                href={job.applyUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                View listing
+                              </a>
+                            )}
                             <button
                               type="button"
                               className={styles.primaryBtn}
                               disabled={applied}
                               onClick={() => applyJob(job)}
                             >
-                              {applied ? 'Applied' : 'Apply'}
+                              {applied ? 'Applied' : 'Track apply'}
                             </button>
                           </div>
                         </article>

@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
-import { getCareersHub, invalidateCareersHub } from '../services/careersLlmService';
+import { getCareersHub, invalidateCareersHub } from '../services/careersJobsService';
 import { suggestResumeImprovements, type ResumeData } from '../services/resumeLlmService';
 
 function mapError(err: unknown): { status: number; message: string } {
@@ -8,8 +8,11 @@ function mapError(err: unknown): { status: number; message: string } {
   if (msg === 'MISTRAL_API_KEY_MISSING' || msg.includes('MISTRAL_API_KEY')) {
     return { status: 503, message: 'Mistral is not configured (missing MISTRAL_API_KEY).' };
   }
+  if (msg.toLowerCase().includes('live job') || msg.toLowerCase().includes('unavailable')) {
+    return { status: 502, message: msg };
+  }
   if (msg.toLowerCase().includes('json') || msg.includes('Zod')) {
-    return { status: 502, message: `LLM returned invalid careers JSON: ${msg}` };
+    return { status: 502, message: `Invalid careers payload: ${msg}` };
   }
   return { status: 500, message: msg };
 }

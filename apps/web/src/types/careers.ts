@@ -15,6 +15,9 @@ export interface CareerJob {
   preferred: boolean;
   tags?: string[];
   description?: string;
+  /** External listing URL from the live jobs provider */
+  applyUrl?: string;
+  sourceProvider?: string;
   /** About Role tab */
   aboutCompany?: string;
   companyCategory?: string;
@@ -43,7 +46,7 @@ export interface CareerProfile {
 }
 
 export interface CareersHubPack {
-  source: 'llm';
+  source: 'live' | 'llm';
   generatedAt?: string;
   profile: CareerProfile;
   jobs: CareerJob[];
@@ -207,7 +210,7 @@ export function withApplicationStatus(
   };
 }
 
-/** Fill About Role / Requirements content when LLM fields are missing */
+/** Fill About Role / Requirements content when provider fields are missing */
 export function getJobAboutRole(job: CareerJob) {
   const skills = job.mandatorySkills?.length
     ? job.mandatorySkills

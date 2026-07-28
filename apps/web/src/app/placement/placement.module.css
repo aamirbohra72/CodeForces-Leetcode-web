@@ -194,6 +194,9 @@
 .ghostBtn {
   background: #242424;
   color: #e5e5e5;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
 }
 
 .primaryBtn {

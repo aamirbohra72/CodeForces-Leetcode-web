@@ -379,7 +379,7 @@ export default function LearnPage() {
               <Link
                 key={course.id}
                 href={`/learn/${course.id}`}
-                style={{ textDecoration: 'none', color: 'inherit' }}
+                style={{ textDecoration: 'none', color: 'inherit', display: 'flex', height: '100%' }}
               >
                 <div
                   style={{
@@ -389,6 +389,10 @@ export default function LearnPage() {
                     cursor: 'pointer',
                     transition: 'transform 0.2s, box-shadow 0.2s',
                     border: '1px solid #3a3a3a',
+                    height: '100%',
+                    width: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.transform = 'translateY(-4px)';
@@ -402,6 +406,7 @@ export default function LearnPage() {
                   <div
                     style={{
                       height: '200px',
+                      flexShrink: 0,
                       background: `linear-gradient(135deg, ${
                         course.category === 'DSA'
                           ? '#f59e0b, #ef4444'
@@ -456,7 +461,15 @@ export default function LearnPage() {
                     )}
                   </div>
 
-                  <div style={{ padding: '1.5rem' }}>
+                  <div
+                    style={{
+                      padding: '1.5rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      flex: 1,
+                      minHeight: 0,
+                    }}
+                  >
                     <h3
                       style={{
                         fontSize: '1.5rem',
@@ -513,7 +526,6 @@ export default function LearnPage() {
                         fontSize: '0.9rem',
                         lineHeight: '1.6',
                         marginBottom: '1.5rem',
-                        minHeight: '3.2rem',
                       }}
                     >
                       {course.description}
@@ -523,6 +535,7 @@ export default function LearnPage() {
                       style={{
                         width: '100%',
                         padding: '0.75rem',
+                        marginTop: 'auto',
                         background: course.isPremium ? '#f59e0b' : '#22c55e',
                         color: 'white',
                         border: 'none',
