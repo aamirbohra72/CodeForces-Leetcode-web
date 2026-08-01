@@ -5,6 +5,11 @@ import Link from 'next/link';
 import { DashboardShell } from '@/components/DashboardShell';
 import { api } from '@/lib/api';
 import { getToken } from '@/lib/auth';
+import {
+  COURSE_PRODUCT_IDS,
+  learnPathForProduct,
+  markLocalEnrollment,
+} from '@/lib/enrollment';
 import { startRazorpayCheckout } from '@/lib/razorpayCheckout';
 import styles from './billing.module.css';
 
@@ -26,6 +31,41 @@ type Product = {
   currency: string;
 };
 
+const PRODUCT_UI: Record<
+  string,
+  { badge: string; accent: string; features: string[] }
+> = {
+  '1': {
+    badge: 'DSA',
+    accent: '#f59e0b',
+    features: ['Full syllabus access', 'Tutorials & assignments', 'Lifetime course updates'],
+  },
+  '2': {
+    badge: 'Backend',
+    accent: '#38bdf8',
+    features: ['Node.js path', 'API & DB modules', 'Project-ready patterns'],
+  },
+  '3': {
+    badge: 'Frontend',
+    accent: '#a78bfa',
+    features: ['React curriculum', 'Hooks & architecture', 'Interview-ready drills'],
+  },
+  '5': {
+    badge: 'System Design',
+    accent: '#22d3ee',
+    features: ['Scalability playbooks', 'Interview frameworks', 'Case study walkthroughs'],
+  },
+  'ai-generate': {
+    badge: 'AI Credit',
+    accent: '#34d399',
+    features: ['1 AI course generation', 'Custom notebook outline', 'Works with Create Own Course'],
+  },
+};
+
+function formatInr(paise: number) {
+  return `₹${(paise / 100).toFixed(0)}`;
+}
+
 export function BillingPageClient() {
   const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -34,6 +74,7 @@ export function BillingPageClient() {
   const [payingId, setPayingId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [lastUnlocked, setLastUnlocked] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -48,7 +89,11 @@ export function BillingPageClient() {
           api.get<{ enrollments: Array<{ productId: string }> }>('/payments/enrollments'),
         ]);
         setPayments(history.payments);
-        setEnrolled(new Set(enrollments.enrollments.map((e) => e.productId)));
+        const ids = enrollments.enrollments.map((e) => e.productId);
+        setEnrolled(new Set(ids));
+        for (const id of ids) {
+          if (COURSE_PRODUCT_IDS.has(id)) markLocalEnrollment(id);
+        }
       } else {
         setPayments([]);
         setEnrolled(new Set());
@@ -72,9 +117,17 @@ export function BillingPageClient() {
     setPayingId(productId);
     setError('');
     setMessage('');
+    setLastUnlocked(null);
     try {
-      await startRazorpayCheckout(productId);
-      setMessage('Payment successful! Access unlocked.');
+      const result = await startRazorpayCheckout(productId);
+      markLocalEnrollment(result.productId);
+      setEnrolled((prev) => new Set(prev).add(result.productId));
+      setLastUnlocked(result.productId);
+      setMessage(
+        COURSE_PRODUCT_IDS.has(result.productId)
+          ? 'Payment successful! Course unlocked on Courses.'
+          : 'Payment successful! Access unlocked.',
+      );
       await refresh();
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Payment failed';
@@ -84,106 +137,131 @@ export function BillingPageClient() {
     }
   };
 
+  const unlockedHref = lastUnlocked ? learnPathForProduct(lastUnlocked) : null;
+
   return (
     <DashboardShell mainClassName="relative min-h-0 flex flex-1 flex-col overflow-y-auto p-0">
       <div className={styles.billingRoot}>
         <section className={styles.billingMain}>
           <main className={styles.content}>
-            <h1>Billing</h1>
-            <p>Purchase premium courses or AI generation credits with Razorpay (test mode).</p>
+            <header className={styles.hero}>
+              <p className={styles.eyebrow}>Razorpay · Test mode</p>
+              <h1>Billing</h1>
+              <p className={styles.lead}>
+                Unlock premium courses or AI generation credits. Purchases sync instantly to your
+                Courses library.
+              </p>
+            </header>
 
-            {error && <p style={{ color: '#f87171', marginTop: '1rem' }}>{error}</p>}
-            {message && <p style={{ color: '#4ade80', marginTop: '1rem' }}>{message}</p>}
+            {error ? <p className={`${styles.banner} ${styles.bannerError}`}>{error}</p> : null}
+            {message ? (
+              <p className={`${styles.banner} ${styles.bannerOk}`}>
+                {message}
+                {unlockedHref ? (
+                  <>
+                    {' '}
+                    <Link href={unlockedHref}>Open course</Link>
+                    {' · '}
+                    <Link href="/learn">View all courses</Link>
+                  </>
+                ) : null}
+              </p>
+            ) : null}
 
-            <h2 style={{ marginTop: '2rem', fontSize: '1.25rem' }}>Available products</h2>
+            <h2 className={styles.sectionTitle}>Available products</h2>
             {loading ? (
-              <p style={{ color: '#9ca3af' }}>Loading…</p>
+              <p className={styles.muted}>Loading catalog…</p>
             ) : (
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-                  gap: '1rem',
-                  marginTop: '1rem',
-                }}
-              >
+              <div className={styles.grid}>
                 {products.map((p) => {
                   const owned = enrolled.has(p.productId);
+                  const ui = PRODUCT_UI[p.productId] || {
+                    badge: 'Product',
+                    accent: '#22c55e',
+                    features: [p.description],
+                  };
+                  const courseHref = learnPathForProduct(p.productId);
+
                   return (
-                    <div
+                    <article
                       key={p.productId}
-                      style={{
-                        border: '1px solid #3a3a3a',
-                        borderRadius: 12,
-                        padding: '1rem',
-                        background: '#1a1a1a',
-                      }}
+                      className={`${styles.card} ${owned ? styles.cardOwned : ''}`}
+                      style={{ ['--accent' as string]: ui.accent }}
                     >
-                      <h3 style={{ margin: 0 }}>{p.title}</h3>
-                      <p style={{ color: '#9ca3af', fontSize: 14 }}>{p.description}</p>
-                      <p style={{ fontWeight: 700, margin: '0.75rem 0' }}>
-                        ₹{(p.amountPaise / 100).toFixed(0)}
-                      </p>
-                      <button
-                        type="button"
-                        disabled={owned || payingId === p.productId}
-                        className={styles.cta}
-                        style={{
-                          opacity: owned ? 0.6 : 1,
-                          cursor: owned ? 'default' : 'pointer',
-                          border: 'none',
-                          width: '100%',
-                        }}
-                        onClick={() => void handlePay(p.productId)}
-                      >
-                        {owned
-                          ? 'Owned'
-                          : payingId === p.productId
-                            ? 'Opening checkout…'
-                            : 'Pay with Razorpay'}
-                      </button>
-                    </div>
+                      <div className={styles.cardAccent} />
+                      <div className={styles.cardBody}>
+                        <div className={styles.badgeRow}>
+                          <span className={styles.badge}>{ui.badge}</span>
+                          {COURSE_PRODUCT_IDS.has(p.productId) ? (
+                            <span className={styles.badgeMuted}>Course</span>
+                          ) : (
+                            <span className={styles.badgeMuted}>Credit</span>
+                          )}
+                          {owned ? <span className={styles.ownedPill}>Owned</span> : null}
+                        </div>
+                        <h3 className={styles.cardTitle}>{p.title}</h3>
+                        <p className={styles.cardDesc}>{p.description}</p>
+                        <ul className={styles.features}>
+                          {ui.features.map((f) => (
+                            <li key={f}>{f}</li>
+                          ))}
+                        </ul>
+                        <div className={styles.priceRow}>
+                          <span className={styles.price}>{formatInr(p.amountPaise)}</span>
+                          <span className={styles.priceNote}>one-time</span>
+                        </div>
+                        {owned && courseHref ? (
+                          <Link href={courseHref} className={`${styles.cta} ${styles.ctaSecondary}`}>
+                            Open in Courses
+                          </Link>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={owned || payingId === p.productId}
+                            className={styles.cta}
+                            onClick={() => void handlePay(p.productId)}
+                          >
+                            {owned
+                              ? 'Owned'
+                              : payingId === p.productId
+                                ? 'Opening checkout…'
+                                : 'Pay with Razorpay'}
+                          </button>
+                        )}
+                      </div>
+                    </article>
                   );
                 })}
               </div>
             )}
 
-            <h2 style={{ marginTop: '2.5rem', fontSize: '1.25rem' }}>Payment history</h2>
+            <h2 className={styles.sectionTitle}>Payment history</h2>
             {!getToken() ? (
-              <p style={{ color: '#9ca3af' }}>
-                <Link href="/sign-in" className={styles.cta}>
-                  Sign in
-                </Link>{' '}
-                to view billing history.
+              <p className={styles.muted}>
+                <Link href="/sign-in">Sign in</Link> to view billing history.
               </p>
             ) : payments.length === 0 ? (
-              <p style={{ color: '#9ca3af' }}>No payments yet.</p>
+              <p className={styles.muted}>No payments yet.</p>
             ) : (
-              <ul style={{ listStyle: 'none', padding: 0, marginTop: '1rem' }}>
+              <ul className={styles.history}>
                 {payments.map((pay) => (
-                  <li
-                    key={pay.id}
-                    style={{
-                      borderBottom: '1px solid #2a2a2a',
-                      padding: '0.75rem 0',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      gap: '1rem',
-                    }}
-                  >
+                  <li key={pay.id} className={styles.historyItem}>
                     <div>
-                      <div style={{ fontWeight: 600 }}>{pay.productTitle}</div>
-                      <div style={{ color: '#9ca3af', fontSize: 13 }}>
-                        {new Date(pay.createdAt).toLocaleString()} · {pay.status}
+                      <div className={styles.historyTitle}>{pay.productTitle}</div>
+                      <div className={styles.historyMeta}>
+                        {new Date(pay.createdAt).toLocaleString()} ·{' '}
+                        <span className={pay.status === 'PAID' ? styles.statusPaid : undefined}>
+                          {pay.status}
+                        </span>
                       </div>
                     </div>
-                    <div style={{ fontWeight: 600 }}>₹{(pay.amountPaise / 100).toFixed(0)}</div>
+                    <div className={styles.historyAmount}>{formatInr(pay.amountPaise)}</div>
                   </li>
                 ))}
               </ul>
             )}
 
-            <Link href="/learn" className={styles.cta} style={{ display: 'inline-block', marginTop: '2rem' }}>
+            <Link href="/learn" className={`${styles.cta} ${styles.ctaGhost}`}>
               Back to Courses
             </Link>
           </main>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   BLOG_FEATURED,
@@ -8,6 +8,8 @@ import {
   BLOG_TOPICS,
   type BlogPost,
 } from '@/data/blog';
+import { api } from '@/lib/api';
+import type { BlogHub, BlogLivePost } from '@/types/blog-hub';
 import { BlogFeaturedCard } from '@/components/blog/BlogFeaturedCard';
 import { BlogPostCompactCard } from '@/components/blog/BlogPostCompactCard';
 import { BlogSidebar } from '@/components/blog/BlogSidebar';
@@ -23,37 +25,149 @@ function matchesQuery(post: BlogPost, q: string) {
   return (
     normalize(post.title).includes(n) ||
     normalize(post.author).includes(n) ||
-    post.tags.some((t) => normalize(t).includes(n))
+    post.tags.some((t) => normalize(t).includes(n)) ||
+    (post.category ? normalize(post.category).includes(n) : false)
   );
 }
 
+function toBlogPost(p: BlogLivePost): BlogPost {
+  return {
+    id: p.id,
+    title: p.title,
+    author: p.author,
+    date: p.date,
+    excerpt: p.excerpt,
+    readMinutes: p.readMinutes,
+    tags: p.tags,
+    featured: p.featured,
+    body: p.body,
+    source: 'mistral',
+    category: p.category,
+  };
+}
+
+const CATEGORY_LABEL: Record<string, string> = {
+  algorithms: 'Algorithms',
+  'system-design': 'System design',
+  genai: 'GenAI',
+  blockchain: 'Blockchain',
+  careers: 'Careers',
+  contest: 'Contests',
+};
+
 export function BlogIndexView() {
   const [query, setQuery] = useState('');
+  const [hub, setHub] = useState<BlogHub | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState('');
+  const [category, setCategory] = useState<string>('all');
 
-  const featuredLead = BLOG_FEATURED[0];
-  const featuredRest = BLOG_FEATURED.slice(1);
+  const load = useCallback(async (refresh = false) => {
+    if (refresh) setRefreshing(true);
+    else setLoading(true);
+    setError('');
+    try {
+      const data = refresh
+        ? await api.post<BlogHub>('/blog/refresh', {})
+        : await api.get<BlogHub>('/blog');
+      setHub(data);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load live posts');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load(false);
+  }, [load]);
+
+  const editorialFeatured = useMemo(
+    () => BLOG_FEATURED.map((p) => ({ ...p, source: 'editorial' as const })),
+    [],
+  );
+  const editorialRecent = useMemo(
+    () => BLOG_RECENT.map((p) => ({ ...p, source: 'editorial' as const })),
+    [],
+  );
+
+  const livePosts = useMemo(
+    () => (hub?.posts ?? []).map(toBlogPost),
+    [hub],
+  );
+
+  const featuredLead = editorialFeatured[0];
+  const featuredRest = editorialFeatured.slice(1);
 
   const filteredFeaturedRest = useMemo(
     () => featuredRest.filter((p) => matchesQuery(p, query)),
     [featuredRest, query],
   );
-  const filteredRecent = useMemo(() => BLOG_RECENT.filter((p) => matchesQuery(p, query)), [query]);
+  const filteredRecent = useMemo(
+    () => editorialRecent.filter((p) => matchesQuery(p, query)),
+    [editorialRecent, query],
+  );
+  const filteredLive = useMemo(() => {
+    return livePosts.filter((p) => {
+      if (category !== 'all' && p.category !== category) return false;
+      return matchesQuery(p, query);
+    });
+  }, [livePosts, category, query]);
+
+  const liveFeatured = filteredLive.filter((p) => p.featured);
+  const liveRest = filteredLive.filter((p) => !p.featured);
 
   const showFeaturedLead = matchesQuery(featuredLead, query);
-  const hasAny =
+  const hasEditorial =
     showFeaturedLead || filteredFeaturedRest.length > 0 || filteredRecent.length > 0;
+  const hasLive = filteredLive.length > 0;
+  const hasAny = hasEditorial || hasLive || loading;
+
+  const categories = useMemo(() => {
+    const set = new Set(livePosts.map((p) => p.category).filter(Boolean) as string[]);
+    return ['all', ...Array.from(set)];
+  }, [livePosts]);
 
   return (
     <div className="min-h-full">
-      <div className="border-b border-white/[0.06] bg-[#161616]">
-        <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-green-400/90">Engineering blog</p>
-          <h1 className="mt-3 font-nav-brand text-3xl font-bold text-white sm:text-4xl lg:text-5xl">
-            Build faster. Think deeper.
+      <div className="relative overflow-hidden border-b border-white/[0.06] bg-[#161616]">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_420px_at_12%_-20%,rgba(34,197,94,0.14),transparent_55%),radial-gradient(700px_360px_at_88%_0%,rgba(56,189,248,0.1),transparent_50%)]"
+        />
+        <div className="relative mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-green-400/90">
+            Engineering blog · Live via Mistral
+          </p>
+          <h1 className="mt-3 max-w-3xl font-nav-brand text-3xl font-bold text-white sm:text-4xl lg:text-5xl">
+            {hub?.headline || 'Build faster. Think deeper.'}
           </h1>
           <p className="mt-4 max-w-2xl text-base leading-relaxed text-white/60">
-            Tutorials, contest strategy, and system design notes—same dark workspace as your practice and courses.
+            {hub?.summary ||
+              'Editorial tutorials plus fresh GenAI, blockchain, contest, and career notes — generated in real time.'}
           </p>
+          <div className="mt-6 flex flex-wrap items-center gap-3">
+            <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-white/55">
+              {hub?.generatedAt
+                ? `Live pack · ${new Date(hub.generatedAt).toLocaleString()}`
+                : loading
+                  ? 'Fetching live pack…'
+                  : 'Editorial posts ready'}
+            </span>
+            <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-white/55">
+              {editorialFeatured.length + editorialRecent.length} editorial · {livePosts.length || '—'} live
+            </span>
+            <button
+              type="button"
+              disabled={loading || refreshing}
+              onClick={() => void load(true)}
+              className="ml-auto rounded-full bg-gradient-to-r from-emerald-400 to-cyan-400 px-4 py-1.5 text-xs font-semibold text-[#052e16] transition disabled:opacity-60"
+            >
+              {refreshing ? 'Regenerating…' : 'Regenerate with Mistral'}
+            </button>
+          </div>
           <div className="mt-8 flex max-w-xl flex-col gap-3 sm:flex-row sm:items-center">
             <label htmlFor="blog-search" className="sr-only">
               Search articles
@@ -73,6 +187,14 @@ export function BlogIndexView() {
               Write a post
             </Link>
           </div>
+          {error ? (
+            <p className="mt-4 text-sm text-red-400">
+              Live posts unavailable: {error}{' '}
+              <button type="button" className="underline" onClick={() => void load(true)}>
+                Retry
+              </button>
+            </p>
+          ) : null}
         </div>
       </div>
 
@@ -100,6 +222,67 @@ export function BlogIndexView() {
                   <BlogFeaturedCard post={featuredLead} />
                 </section>
               ) : null}
+
+              <section aria-labelledby="live-heading">
+                <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+                  <BlogSectionTitle id="live-heading">Live from Mistral</BlogSectionTitle>
+                  <div className="flex flex-wrap gap-2">
+                    {categories.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setCategory(c)}
+                        className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+                          category === c
+                            ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-300'
+                            : 'border-white/10 bg-white/[0.03] text-white/55 hover:border-white/20'
+                        }`}
+                      >
+                        {c === 'all' ? 'All' : CATEGORY_LABEL[c] || c}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {loading && !hub ? (
+                  <div className="rounded-xl border border-white/10 bg-[#1a1a1a] px-6 py-10 text-center text-sm text-white/50">
+                    <div className="mx-auto mb-3 h-7 w-7 animate-spin rounded-full border-2 border-white/15 border-t-emerald-400" />
+                    Generating fresh articles with Mistral…
+                  </div>
+                ) : null}
+
+                {liveFeatured.length > 0 ? (
+                  <div className="mb-5 space-y-5">
+                    {liveFeatured.map((post) => (
+                      <div key={post.id} className="relative">
+                        <span className="absolute right-4 top-4 z-10 rounded-full border border-cyan-400/30 bg-cyan-400/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-cyan-300">
+                          AI · {CATEGORY_LABEL[post.category || ''] || post.category}
+                        </span>
+                        <BlogFeaturedCard post={post} />
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+
+                {liveRest.length > 0 ? (
+                  <div className="grid gap-5 sm:grid-cols-2">
+                    {liveRest.map((post) => (
+                      <div key={post.id} className="relative">
+                        <span className="absolute right-3 top-3 z-10 rounded-full border border-white/10 bg-[#121212]/90 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white/55">
+                          {CATEGORY_LABEL[post.category || ''] || 'Live'}
+                        </span>
+                        <BlogPostCompactCard post={post} highlight />
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+
+                {!loading && hub && filteredLive.length === 0 ? (
+                  <p className="rounded-lg border border-white/10 bg-[#242424] px-4 py-8 text-center text-sm text-white/50">
+                    No live posts match this filter.
+                  </p>
+                ) : null}
+              </section>
 
               {filteredFeaturedRest.length > 0 ? (
                 <section aria-labelledby="editorial-heading">

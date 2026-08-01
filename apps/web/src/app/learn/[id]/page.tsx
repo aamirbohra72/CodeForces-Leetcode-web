@@ -5,6 +5,9 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { DashboardShell } from '@/components/DashboardShell';
 import { api } from '@/lib/api';
+import { getToken } from '@/lib/auth';
+import { isLocallyEnrolled, markLocalEnrollment } from '@/lib/enrollment';
+import { startRazorpayCheckout } from '@/lib/razorpayCheckout';
 import { getAssignmentsForCourse } from '@/data/assignments';
 import { getTutorialsForCourse } from '@/data/tutorials/system-design';
 import { isLlmDrivenCourse, type LlmCoursePack } from '@/types/llm-course';
@@ -87,6 +90,8 @@ export default function CourseDetailPage() {
   const llmCourse = isLlmDrivenCourse(courseId);
 
   const [enrolled, setEnrolled] = useState(false);
+  const [enrollLoading, setEnrollLoading] = useState(false);
+  const [enrollError, setEnrollError] = useState('');
   const [tab, setTab] = useState<Tab>('tutorials');
   const [llmPack, setLlmPack] = useState<LlmCoursePack | null>(null);
   const [llmLoading, setLlmLoading] = useState(false);
@@ -94,8 +99,39 @@ export default function CourseDetailPage() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const key = `enrolled:course:${courseId}`;
-    setEnrolled(localStorage.getItem(key) === '1');
+    setEnrolled(isLocallyEnrolled(courseId));
+
+    if (!getToken()) return;
+
+    let cancelled = false;
+    void api
+      .get<{ enrolled: boolean }>(`/payments/enrollments/${encodeURIComponent(courseId)}`)
+      .then((data) => {
+        if (cancelled) return;
+        if (data.enrolled) {
+          markLocalEnrollment(courseId);
+          setEnrolled(true);
+        }
+      })
+      .catch(() => undefined);
+
+    const onEnrollment = (event: Event) => {
+      const detail = (event as CustomEvent).detail as
+        | { productId?: string; productIds?: string[] }
+        | undefined;
+      if (
+        detail?.productId === courseId ||
+        detail?.productIds?.includes(courseId) ||
+        isLocallyEnrolled(courseId)
+      ) {
+        setEnrolled(true);
+      }
+    };
+    window.addEventListener('enrollment:updated', onEnrollment);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('enrollment:updated', onEnrollment);
+    };
   }, [courseId]);
 
   useEffect(() => {
@@ -118,10 +154,28 @@ export default function CourseDetailPage() {
     };
   }, [courseId, llmCourse, enrolled]);
 
-  const enroll = () => {
-    setEnrolled(true);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(`enrolled:course:${courseId}`, '1');
+  const enroll = async () => {
+    if (enrolled) return;
+    if (!course.isPremium) {
+      setEnrolled(true);
+      markLocalEnrollment(courseId);
+      return;
+    }
+    if (!getToken()) {
+      window.location.href = `/sign-in?redirect_url=/learn/${courseId}`;
+      return;
+    }
+    setEnrollLoading(true);
+    setEnrollError('');
+    try {
+      await startRazorpayCheckout(courseId);
+      markLocalEnrollment(courseId);
+      setEnrolled(true);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Payment failed';
+      if (msg !== 'Payment cancelled') setEnrollError(msg);
+    } finally {
+      setEnrollLoading(false);
     }
   };
 
@@ -220,7 +274,8 @@ export default function CourseDetailPage() {
             </p>
 
             <button
-              onClick={enroll}
+              onClick={() => void enroll()}
+              disabled={enrolled || enrollLoading}
               style={{
                 padding: '1rem 2rem',
                 background: enrolled ? '#22c55e' : '#f59e0b',
@@ -229,11 +284,21 @@ export default function CourseDetailPage() {
                 borderRadius: 8,
                 fontSize: '1.1rem',
                 fontWeight: 600,
-                cursor: 'pointer',
+                cursor: enrolled ? 'default' : 'pointer',
+                opacity: enrollLoading ? 0.7 : 1,
               }}
             >
-              {enrolled ? '✓ Enrolled' : 'Enroll Now'}
+              {enrolled
+                ? '✓ Enrolled'
+                : enrollLoading
+                  ? 'Opening checkout…'
+                  : course.isPremium
+                    ? 'Buy & Enroll'
+                    : 'Enroll Now'}
             </button>
+            {enrollError ? (
+              <p style={{ marginTop: '0.75rem', color: '#f87171', fontSize: '0.9rem' }}>{enrollError}</p>
+            ) : null}
           </div>
 
           <div

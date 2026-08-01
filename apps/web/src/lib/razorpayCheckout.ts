@@ -2,6 +2,7 @@
 
 import { api } from '@/lib/api';
 import { getToken } from '@/lib/auth';
+import { markLocalEnrollment } from '@/lib/enrollment';
 
 export type CreateOrderResponse = {
   orderId: string;
@@ -67,6 +68,7 @@ export async function startRazorpayCheckout(productId: string): Promise<{ produc
             razorpay_payment_id: response.razorpay_payment_id,
             razorpay_signature: response.razorpay_signature,
           });
+          markLocalEnrollment(order.productId);
           resolve({ productId: order.productId });
         } catch (err) {
           reject(err instanceof Error ? err : new Error('Payment verification failed'));

@@ -14,6 +14,8 @@ import { courseRoutes } from './routes/courses';
 import { careersRoutes } from './routes/careers';
 import { progressRoutes } from './routes/progress';
 import { paymentRoutes } from './routes/payments';
+import { projectsRoutes } from './routes/projects';
+import { blogRoutes } from './routes/blog';
 import { connectRedis, disconnectRedis } from './services/redisService';
 import {
   assertEmailConfigForRuntime,
@@ -49,6 +51,8 @@ app.use('/api/interview', interviewRoutes);
 app.use('/api/courses', courseRoutes);
 app.use('/api/progress', progressRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/projects', projectsRoutes);
+app.use('/api/blog', blogRoutes);
 app.use('/api/careers', careersRoutes);
 
 // Health check

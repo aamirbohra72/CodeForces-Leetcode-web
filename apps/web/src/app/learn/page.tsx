@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { DashboardShell } from '@/components/DashboardShell';
 import { api } from '@/lib/api';
 import { getToken } from '@/lib/auth';
+import { markLocalEnrollment, markLocalEnrollments } from '@/lib/enrollment';
 import { startRazorpayCheckout } from '@/lib/razorpayCheckout';
 
 interface Course {
@@ -107,10 +108,27 @@ export default function LearnPage() {
 
   useEffect(() => {
     if (!getToken()) return;
-    void api
-      .get<{ enrollments: Array<{ productId: string }> }>('/payments/enrollments')
-      .then((data) => setEnrolledIds(new Set(data.enrollments.map((e) => e.productId))))
-      .catch(() => undefined);
+
+    const loadEnrollments = () => {
+      void api
+        .get<{ enrollments: Array<{ productId: string }> }>('/payments/enrollments')
+        .then((data) => {
+          const ids = data.enrollments.map((e) => e.productId);
+          setEnrolledIds(new Set(ids));
+          markLocalEnrollments(ids);
+        })
+        .catch(() => undefined);
+    };
+
+    loadEnrollments();
+
+    const onEnrollment = () => loadEnrollments();
+    window.addEventListener('enrollment:updated', onEnrollment);
+    window.addEventListener('focus', onEnrollment);
+    return () => {
+      window.removeEventListener('enrollment:updated', onEnrollment);
+      window.removeEventListener('focus', onEnrollment);
+    };
   }, []);
 
   const handlePremiumEnroll = async (courseId: string) => {
@@ -126,6 +144,7 @@ export default function LearnPage() {
     setPayError('');
     try {
       await startRazorpayCheckout(courseId);
+      markLocalEnrollment(courseId);
       setEnrolledIds((prev) => new Set(prev).add(courseId));
       window.location.href = `/learn/${courseId}`;
     } catch (e) {

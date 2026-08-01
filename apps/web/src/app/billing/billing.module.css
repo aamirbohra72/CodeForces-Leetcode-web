@@ -3,7 +3,10 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: #1a1a1a;
+  background:
+    radial-gradient(1000px 480px at 8% -10%, rgba(34, 197, 94, 0.12), transparent 55%),
+    radial-gradient(800px 400px at 92% 0%, rgba(56, 189, 248, 0.08), transparent 50%),
+    #121212;
   color: #f3f4f6;
 }
 
@@ -16,70 +19,316 @@
 }
 
 .content {
-  display: grid;
-  flex: 1;
-  align-content: center;
-  justify-items: center;
-  text-align: center;
-  padding: 24px;
-  gap: 14px;
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 3rem;
+  text-align: left;
+}
+
+.hero {
+  margin-bottom: 2rem;
+}
+
+.eyebrow {
+  margin: 0 0 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #34d399;
 }
 
 .content h1 {
   margin: 0;
-  font-size: 43px;
+  font-size: clamp(1.75rem, 3vw, 2.35rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
   color: #fff;
 }
 
-.content p {
+.lead {
+  margin: 0.65rem 0 0;
+  max-width: 36rem;
+  color: #94a3b8;
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+.banner {
+  margin: 1rem 0 0;
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  font-size: 0.9rem;
+}
+
+.bannerError {
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  background: rgba(127, 29, 29, 0.25);
+  color: #fca5a5;
+}
+
+.bannerOk {
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  background: rgba(6, 78, 59, 0.35);
+  color: #86efac;
+}
+
+.bannerOk a {
+  color: #6ee7b7;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.sectionTitle {
+  margin: 2rem 0 1rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 280px;
+  border-radius: 16px;
+  border: 1px solid #2f2f2f;
+  background: linear-gradient(165deg, #1c1c1c 0%, #151515 100%);
+  overflow: hidden;
+  transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+}
+
+.card:hover {
+  border-color: #3f3f3f;
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+}
+
+.cardOwned {
+  border-color: rgba(52, 211, 153, 0.35);
+}
+
+.cardAccent {
+  height: 4px;
+  width: 100%;
+  background: var(--accent, #22c55e);
+}
+
+.cardBody {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  padding: 1.15rem 1.2rem 1.25rem;
+}
+
+.badgeRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+}
+
+.badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+  color: #052e16;
+  background: var(--accent, #22c55e);
+}
+
+.badgeMuted {
+  color: #cbd5e1;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid #333;
+}
+
+.ownedPill {
+  margin-left: auto;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #86efac;
+  background: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+}
+
+.cardTitle {
   margin: 0;
-  max-width: 800px;
-  color: #9ca3af;
-  font-size: 34px;
-  line-height: 1.35;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #f8fafc;
+  line-height: 1.3;
+}
+
+.cardDesc {
+  margin: 0.5rem 0 0;
+  color: #94a3b8;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  flex: 1;
+}
+
+.features {
+  list-style: none;
+  margin: 0.85rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.features li {
+  font-size: 0.78rem;
+  color: #cbd5e1;
+  display: flex;
+  gap: 0.4rem;
+  align-items: flex-start;
+}
+
+.features li::before {
+  content: '';
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  margin-top: 0.35rem;
+  border-radius: 50%;
+  background: var(--accent, #22c55e);
+}
+
+.priceRow {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  margin-top: 1rem;
+}
+
+.price {
+  font-size: 1.65rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #fff;
+}
+
+.priceNote {
+  font-size: 0.75rem;
+  color: #64748b;
 }
 
 .cta {
-  margin-top: 22px;
+  margin-top: 1rem;
   border: 0;
-  border-radius: 24px;
-  background: #16a34a;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #22c55e, #16a34a);
   color: #fff;
-  font-size: 39px;
-  padding: 14px 40px;
+  font-size: 0.9rem;
+  font-weight: 650;
+  padding: 0.7rem 1rem;
   cursor: pointer;
   text-decoration: none;
-  display: inline-block;
-  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  width: 100%;
+  transition: filter 0.15s, opacity 0.15s;
 }
 
-.cta:hover {
-  filter: brightness(1.05);
+.cta:hover:not(:disabled) {
+  filter: brightness(1.08);
 }
 
-.whatsapp {
-  position: absolute;
-  right: 18px;
-  bottom: 18px;
-  width: 44px;
-  height: 44px;
-  border: 0;
-  border-radius: 999px;
-  background: #f59e0b;
-  color: #fff;
-  cursor: pointer;
+.cta:disabled {
+  opacity: 0.55;
+  cursor: default;
 }
 
-@media (max-width: 1000px) {
-  .content h1 {
-    font-size: 32px;
+.ctaSecondary {
+  background: transparent;
+  border: 1px solid rgba(52, 211, 153, 0.4);
+  color: #86efac;
+}
+
+.ctaGhost {
+  width: auto;
+  margin-top: 1.5rem;
+  padding: 0.65rem 1.25rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid #333;
+  color: #e2e8f0;
+}
+
+.history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid #2a2a2a;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #171717;
+}
+
+.historyItem {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.9rem 1.1rem;
+  border-bottom: 1px solid #242424;
+}
+
+.historyItem:last-child {
+  border-bottom: none;
+}
+
+.historyTitle {
+  font-weight: 600;
+  color: #f1f5f9;
+  font-size: 0.92rem;
+}
+
+.historyMeta {
+  margin-top: 0.2rem;
+  color: #64748b;
+  font-size: 0.78rem;
+}
+
+.historyAmount {
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.statusPaid {
+  color: #86efac;
+}
+
+.muted {
+  color: #94a3b8;
+  font-size: 0.9rem;
+}
+
+.muted a {
+  color: #4ade80;
+}
+
+@media (max-width: 640px) {
+  .content {
+    padding: 1.25rem 1rem 2.5rem;
   }
 
-  .content p {
-    font-size: 22px;
-  }
-
-  .cta {
-    font-size: 24px;
+  .price {
+    font-size: 1.4rem;
   }
 }

@@ -7,6 +7,10 @@ export type BlogPost = {
   readMinutes: number;
   tags: string[];
   featured?: boolean;
+  /** Plain-text paragraphs for full article body (live Mistral posts). */
+  body?: string[];
+  source?: 'editorial' | 'mistral';
+  category?: string;
 };
 
 export const BLOG_FEATURED: BlogPost[] = [
