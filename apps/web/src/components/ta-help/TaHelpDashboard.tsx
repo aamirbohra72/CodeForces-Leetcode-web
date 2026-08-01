@@ -26,6 +26,13 @@ export function TaHelpDashboard() {
 
   useEffect(() => {
     setRequests(loadTaHelpRequests());
+    const onUpdate = () => setRequests(loadTaHelpRequests());
+    window.addEventListener('ta-help:updated', onUpdate);
+    window.addEventListener('storage', onUpdate);
+    return () => {
+      window.removeEventListener('ta-help:updated', onUpdate);
+      window.removeEventListener('storage', onUpdate);
+    };
   }, []);
 
   useEffect(() => {

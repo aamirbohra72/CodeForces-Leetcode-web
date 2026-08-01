@@ -184,6 +184,21 @@ export function loadTaHelpRequests(): TaHelpRequest[] {
 export function saveTaHelpRequests(requests: TaHelpRequest[]): void {
   if (typeof window === 'undefined') return;
   localStorage.setItem(TA_HELP_STORAGE_KEY, JSON.stringify(requests));
+  window.dispatchEvent(new CustomEvent('ta-help:updated', { detail: { requests } }));
+}
+
+export function appendTaHelpRequest(input: {
+  title: string;
+  type: TaHelpType;
+  problem: string;
+  topic: string;
+  language: string;
+  description: string;
+}): TaHelpRequest {
+  const created = createTaHelpRequest(input);
+  const existing = loadTaHelpRequests();
+  saveTaHelpRequests([created, ...existing]);
+  return created;
 }
 
 export function createTaHelpRequest(input: {

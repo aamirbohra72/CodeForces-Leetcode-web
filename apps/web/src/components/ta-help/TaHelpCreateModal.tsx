@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { cn } from '@/lib/cn';
 import {
   TA_HELP_LANGUAGES,
@@ -20,18 +20,53 @@ export type TaHelpCreatePayload = {
   topic: string;
   language: string;
   description: string;
+  preferredSlot?: string;
 };
 
 type TaHelpCreateModalProps = {
   open: boolean;
   onClose: () => void;
   onSubmit: (payload: TaHelpCreatePayload) => void;
+  /** Prefill request type (e.g. video for "Request a Call"). */
+  defaultType?: TaHelpType;
+  defaults?: Partial<{
+    title: string;
+    problem: string;
+    topic: string;
+    language: string;
+    description: string;
+  }>;
+  heading?: string;
 };
 
-export function TaHelpCreateModal({ open, onClose, onSubmit }: TaHelpCreateModalProps) {
-  const [type, setType] = useState<TaHelpType>('text');
+const CALL_SLOTS = [
+  'ASAP (next available TA)',
+  'Within 1 hour',
+  'Today evening',
+  'Tomorrow morning',
+] as const;
+
+export function TaHelpCreateModal({
+  open,
+  onClose,
+  onSubmit,
+  defaultType = 'text',
+  defaults,
+  heading,
+}: TaHelpCreateModalProps) {
+  const [type, setType] = useState<TaHelpType>(defaultType);
+  const [slot, setSlot] = useState<string>(CALL_SLOTS[0]);
+
+  useEffect(() => {
+    if (open) {
+      setType(defaultType);
+      setSlot(CALL_SLOTS[0]);
+    }
+  }, [open, defaultType]);
 
   if (!open) return null;
+
+  const isCall = type === 'video';
 
   return (
     <div
@@ -48,7 +83,7 @@ export function TaHelpCreateModal({ open, onClose, onSubmit }: TaHelpCreateModal
       >
         <div className="sticky top-0 flex items-center justify-between border-b border-[#3a3a3a] bg-[#2a2a2a] px-5 py-4">
           <h2 id="ta-help-create-title" className="text-lg font-bold text-white">
-            Ask a Teaching Assistant
+            {heading || (isCall ? 'Request a TA video call' : 'Ask a Teaching Assistant')}
           </h2>
           <button
             type="button"
@@ -65,16 +100,23 @@ export function TaHelpCreateModal({ open, onClose, onSubmit }: TaHelpCreateModal
           onSubmit={(e) => {
             e.preventDefault();
             const fd = new FormData(e.currentTarget);
+            const description = String(fd.get('description') ?? '');
+            const withSlot =
+              type === 'video'
+                ? `${description.trim()}\n\nPreferred call slot: ${slot}`
+                : description;
             onSubmit({
               title: String(fd.get('title') ?? ''),
               type,
               problem: String(fd.get('problem') ?? ''),
               topic: String(fd.get('topic') ?? ''),
               language: String(fd.get('language') ?? ''),
-              description: String(fd.get('description') ?? ''),
+              description: withSlot,
+              preferredSlot: type === 'video' ? slot : undefined,
             });
             e.currentTarget.reset();
-            setType('text');
+            setType(defaultType);
+            setSlot(CALL_SLOTS[0]);
           }}
         >
           <div>
@@ -103,6 +145,29 @@ export function TaHelpCreateModal({ open, onClose, onSubmit }: TaHelpCreateModal
             </div>
           </div>
 
+          {isCall ? (
+            <div>
+              <span className={labelClass}>When should we call?</span>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {CALL_SLOTS.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setSlot(s)}
+                    className={cn(
+                      'rounded-lg border px-3 py-2 text-left text-xs font-medium transition',
+                      slot === s
+                        ? 'border-sky-400/50 bg-sky-500/15 text-sky-200'
+                        : 'border-[#3a3a3a] text-[#b0b0b0] hover:border-[#4a4a4a]',
+                    )}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
           <div>
             <label className={labelClass} htmlFor="ta-title">
               Title
@@ -112,6 +177,8 @@ export function TaHelpCreateModal({ open, onClose, onSubmit }: TaHelpCreateModal
               name="title"
               required
               minLength={4}
+              defaultValue={defaults?.title || (isCall ? 'Request a TA video call' : '')}
+              key={`title-${open}-${defaults?.title || ''}-${isCall}`}
               className={inputClass}
               placeholder="e.g. Facing compilation error"
             />
@@ -126,6 +193,8 @@ export function TaHelpCreateModal({ open, onClose, onSubmit }: TaHelpCreateModal
               name="problem"
               required
               minLength={2}
+              defaultValue={defaults?.problem || 'General support'}
+              key={`problem-${open}-${defaults?.problem || ''}`}
               className={inputClass}
               placeholder="Problem name"
             />
@@ -136,7 +205,14 @@ export function TaHelpCreateModal({ open, onClose, onSubmit }: TaHelpCreateModal
               <label className={labelClass} htmlFor="ta-topic">
                 Topic
               </label>
-              <select id="ta-topic" name="topic" required className={inputClass} defaultValue="">
+              <select
+                id="ta-topic"
+                name="topic"
+                required
+                className={inputClass}
+                defaultValue={defaults?.topic || ''}
+                key={`topic-${open}-${defaults?.topic || ''}`}
+              >
                 <option value="" disabled>
                   Select topic
                 </option>
@@ -151,7 +227,14 @@ export function TaHelpCreateModal({ open, onClose, onSubmit }: TaHelpCreateModal
               <label className={labelClass} htmlFor="ta-language">
                 Language
               </label>
-              <select id="ta-language" name="language" required className={inputClass} defaultValue="">
+              <select
+                id="ta-language"
+                name="language"
+                required
+                className={inputClass}
+                defaultValue={defaults?.language || ''}
+                key={`lang-${open}-${defaults?.language || ''}`}
+              >
                 <option value="" disabled>
                   Select language
                 </option>
@@ -166,7 +249,7 @@ export function TaHelpCreateModal({ open, onClose, onSubmit }: TaHelpCreateModal
 
           <div>
             <label className={labelClass} htmlFor="ta-description">
-              Describe your issue
+              {isCall ? 'What should the TA cover on the call?' : 'Describe your issue'}
             </label>
             <textarea
               id="ta-description"
@@ -174,6 +257,8 @@ export function TaHelpCreateModal({ open, onClose, onSubmit }: TaHelpCreateModal
               required
               minLength={20}
               rows={4}
+              defaultValue={defaults?.description || ''}
+              key={`desc-${open}-${defaults?.description || ''}`}
               className={cn(inputClass, 'resize-y')}
               placeholder="What have you tried? Where are you stuck?"
             />
@@ -191,7 +276,7 @@ export function TaHelpCreateModal({ open, onClose, onSubmit }: TaHelpCreateModal
               type="submit"
               className="flex-1 rounded-lg bg-orange-500 py-2.5 text-sm font-semibold text-white hover:bg-orange-600"
             >
-              Submit request
+              {isCall ? 'Request call' : 'Submit request'}
             </button>
           </div>
         </form>

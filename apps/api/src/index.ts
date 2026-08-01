@@ -16,6 +16,7 @@ import { progressRoutes } from './routes/progress';
 import { paymentRoutes } from './routes/payments';
 import { projectsRoutes } from './routes/projects';
 import { blogRoutes } from './routes/blog';
+import { companionRoutes } from './routes/companion';
 import { connectRedis, disconnectRedis } from './services/redisService';
 import {
   assertEmailConfigForRuntime,
@@ -53,6 +54,7 @@ app.use('/api/progress', progressRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/projects', projectsRoutes);
 app.use('/api/blog', blogRoutes);
+app.use('/api/companion', companionRoutes);
 app.use('/api/careers', careersRoutes);
 
 // Health check

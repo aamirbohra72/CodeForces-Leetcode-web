@@ -7,6 +7,7 @@ import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from '@cl
 import { getUser, isAdmin } from '@/lib/auth';
 import { cn } from '@/lib/cn';
 import { SidebarTrigger } from '@/components/SidebarTrigger';
+import { SupportCompanion } from '@/components/support/SupportCompanion';
 
 export type AppNavbarProps = {
   className?: string;
@@ -105,6 +106,7 @@ export function AppNavbar({ className, activeHref, activePage }: AppNavbarProps)
         </div>
 
         <div className="relative z-10 ml-auto flex shrink-0 items-center gap-x-2 bg-nav-bg sm:gap-x-3">
+          <SupportCompanion />
           <SignedIn>
             {isAdminUser && (
               <Link

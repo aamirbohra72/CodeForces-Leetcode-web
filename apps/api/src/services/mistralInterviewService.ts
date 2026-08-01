@@ -97,14 +97,24 @@ export async function mistralChat(
   user: string,
   options?: { model?: string; jsonMode?: boolean },
 ): Promise<string> {
-  const apiKey = getApiKey();
-  const body: Record<string, unknown> = {
-    model: options?.model ?? chatModel(),
-    temperature: 0.3,
-    messages: [
+  return mistralChatMessages(
+    [
       { role: 'system', content: system },
       { role: 'user', content: user },
     ],
+    options,
+  );
+}
+
+export async function mistralChatMessages(
+  messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
+  options?: { model?: string; jsonMode?: boolean; temperature?: number },
+): Promise<string> {
+  const apiKey = getApiKey();
+  const body: Record<string, unknown> = {
+    model: options?.model ?? chatModel(),
+    temperature: options?.temperature ?? 0.3,
+    messages,
   };
 
   if (options?.jsonMode) {
