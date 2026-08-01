@@ -1,50 +1,71 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { DashboardShell } from '@/components/DashboardShell';
 import { TaHelpCreateModal, type TaHelpCreatePayload } from '@/components/ta-help/TaHelpCreateModal';
 import { TaHelpRequestCard } from '@/components/ta-help/TaHelpRequestCard';
 import { cn } from '@/lib/cn';
+import { getToken, getUser, isAdmin } from '@/lib/auth';
+import {
+  createTaHelpRequestApi,
+  fetchMyTaHelpRequests,
+  submitTaHelpFeedbackApi,
+} from '@/lib/taHelpApi';
 import {
   TA_HELP_TABS,
   type TaHelpRequest,
   type TaHelpStatus,
   countByStatus,
-  createTaHelpRequest,
-  loadTaHelpRequests,
-  saveTaHelpRequests,
 } from '@/data/ta-help';
 
 export function TaHelpDashboard() {
   const [requests, setRequests] = useState<TaHelpRequest[]>([]);
-  const [tab, setTab] = useState<TaHelpStatus>('resolved');
+  const [tab, setTab] = useState<TaHelpStatus>('waiting');
   const [createOpen, setCreateOpen] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [topicFilter, setTopicFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [toast, setToast] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const staff = isAdmin() || getUser()?.role === 'TA';
+
+  const refresh = useCallback(async () => {
+    if (!getToken()) {
+      setRequests([]);
+      setLoading(false);
+      setError('Sign in to view and raise TA help requests.');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      const data = await fetchMyTaHelpRequests();
+      setRequests(data.requests);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load TA help');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    setRequests(loadTaHelpRequests());
-    const onUpdate = () => setRequests(loadTaHelpRequests());
+    void refresh();
+    const onUpdate = () => void refresh();
     window.addEventListener('ta-help:updated', onUpdate);
-    window.addEventListener('storage', onUpdate);
+    window.addEventListener('focus', onUpdate);
     return () => {
       window.removeEventListener('ta-help:updated', onUpdate);
-      window.removeEventListener('storage', onUpdate);
+      window.removeEventListener('focus', onUpdate);
     };
-  }, []);
+  }, [refresh]);
 
   useEffect(() => {
     if (!toast) return;
     const t = window.setTimeout(() => setToast(null), 2800);
     return () => window.clearTimeout(t);
   }, [toast]);
-
-  const persist = useCallback((next: TaHelpRequest[]) => {
-    setRequests(next);
-    saveTaHelpRequests(next);
-  }, []);
 
   const counts = useMemo(() => countByStatus(requests), [requests]);
 
@@ -63,34 +84,47 @@ export function TaHelpDashboard() {
   }, [requests]);
 
   const onCreate = useCallback(
-    (payload: TaHelpCreatePayload) => {
-      const next = [createTaHelpRequest(payload), ...requests];
-      persist(next);
-      setCreateOpen(false);
-      setTab('waiting');
-      setToast('Help request submitted. A TA will pick it up soon.');
+    async (payload: TaHelpCreatePayload) => {
+      try {
+        await createTaHelpRequestApi({ ...payload, source: 'web' });
+        setCreateOpen(false);
+        setTab('waiting');
+        setToast('Help request submitted. A TA will pick it up soon.');
+        await refresh();
+      } catch (e) {
+        setToast(e instanceof Error ? e.message : 'Failed to submit request');
+      }
     },
-    [persist, requests],
+    [refresh],
   );
 
   const onSatisfied = useCallback(
-    (id: string, satisfied: boolean) => {
-      persist(
-        requests.map((r) =>
-          r.id === id ? { ...r, satisfied, rating: satisfied ? r.rating ?? 5 : r.rating } : r,
-        ),
-      );
-      setToast(satisfied ? 'Thanks for the feedback.' : 'We noted your feedback.');
+    async (id: string, satisfied: boolean) => {
+      try {
+        await submitTaHelpFeedbackApi(id, {
+          satisfied,
+          rating: satisfied ? 5 : undefined,
+        });
+        setToast(satisfied ? 'Thanks for the feedback.' : 'We noted your feedback.');
+        await refresh();
+      } catch (e) {
+        setToast(e instanceof Error ? e.message : 'Failed to save feedback');
+      }
     },
-    [persist, requests],
+    [refresh],
   );
 
   const onRate = useCallback(
-    (id: string, rating: number) => {
-      persist(requests.map((r) => (r.id === id ? { ...r, rating, satisfied: true } : r)));
-      setToast('Rating saved. Thanks!');
+    async (id: string, rating: number) => {
+      try {
+        await submitTaHelpFeedbackApi(id, { rating, satisfied: true });
+        setToast('Rating saved. Thanks!');
+        await refresh();
+      } catch (e) {
+        setToast(e instanceof Error ? e.message : 'Failed to save rating');
+      }
     },
-    [persist, requests],
+    [refresh],
   );
 
   return (
@@ -101,23 +135,36 @@ export function TaHelpDashboard() {
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-2xl font-bold text-white md:text-3xl">TA Help</h1>
               <span className="rounded-full bg-emerald-600/90 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
-                Course active
+                Live queue
               </span>
             </div>
             <p className="mt-2 text-sm text-[#a0a0a0]">
-              Raise text or video help requests and track TA replies in one place.
+              Raise text or video help requests — synced to the database and visible to TAs.
             </p>
+            {staff ? (
+              <Link
+                href="/ta-help/desk"
+                className="mt-2 inline-block text-sm font-semibold text-sky-400 hover:text-sky-300"
+              >
+                Open TA Desk →
+              </Link>
+            ) : null}
           </div>
           <button
             type="button"
-            onClick={() => setCreateOpen(true)}
+            onClick={() => {
+              if (!getToken()) {
+                window.location.href = '/sign-in?redirect_url=/ta-help';
+                return;
+              }
+              setCreateOpen(true);
+            }}
             className="shrink-0 rounded-lg bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-600"
           >
             Ask Support
           </button>
         </header>
 
-        {/* Status tabs */}
         <nav
           className="flex gap-1 overflow-x-auto border-b border-[#3a3a3a]"
           aria-label="Request status"
@@ -150,10 +197,16 @@ export function TaHelpDashboard() {
             ⏱️
           </span>
           <p>
-            Requests will be marked resolved if you don&apos;t take any action. Check the time frame
-            of a request for accurate details.
+            Requests stay in Waiting until a TA claims them. After a TA replies, check the Replied
+            tab — then mark resolved when you&apos;re done.
           </p>
         </div>
+
+        {error ? (
+          <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+            {error}
+          </p>
+        ) : null}
 
         <div className="flex flex-wrap items-center justify-between gap-3">
           <button
@@ -161,7 +214,6 @@ export function TaHelpDashboard() {
             onClick={() => setShowFilters((v) => !v)}
             className="inline-flex items-center gap-2 text-sm font-semibold text-sky-400 hover:text-sky-300"
           >
-            <span aria-hidden>⚙️</span>
             {showFilters ? 'Hide filters' : 'See all filters'}
           </button>
           <p className="text-xs text-[#777]">
@@ -198,23 +250,13 @@ export function TaHelpDashboard() {
                 <option value="video">Video call HR</option>
               </select>
             </label>
-            {(topicFilter !== 'all' || typeFilter !== 'all') && (
-              <button
-                type="button"
-                onClick={() => {
-                  setTopicFilter('all');
-                  setTypeFilter('all');
-                }}
-                className="self-end text-xs font-semibold text-[#888] hover:text-white"
-              >
-                Clear filters
-              </button>
-            )}
           </div>
         )}
 
         <div className="space-y-4">
-          {filtered.length === 0 ? (
+          {loading ? (
+            <p className="text-sm text-[#888]">Loading your requests…</p>
+          ) : filtered.length === 0 ? (
             <div className="rounded-xl border border-dashed border-[#3a3a3a] bg-[#222] px-6 py-12 text-center">
               <p className="text-sm font-medium text-[#c4c4c4]">No requests in this tab</p>
               <p className="mt-1 text-xs text-[#777]">
@@ -233,15 +275,14 @@ export function TaHelpDashboard() {
               <TaHelpRequestCard
                 key={req.id}
                 request={req}
-                onSatisfied={onSatisfied}
-                onRate={onRate}
+                onSatisfied={(id, satisfied) => void onSatisfied(id, satisfied)}
+                onRate={(id, rating) => void onRate(id, rating)}
               />
             ))
           )}
         </div>
       </div>
 
-      {/* Floating new request */}
       <button
         type="button"
         onClick={() => setCreateOpen(true)}
@@ -255,7 +296,7 @@ export function TaHelpDashboard() {
       <TaHelpCreateModal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
-        onSubmit={onCreate}
+        onSubmit={(payload) => void onCreate(payload)}
       />
 
       {toast && (

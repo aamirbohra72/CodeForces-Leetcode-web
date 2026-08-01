@@ -4,7 +4,7 @@ export interface User {
   id: string;
   email: string;
   username: string;
-  role: 'ADMIN' | 'USER';
+  role: 'ADMIN' | 'USER' | 'TA';
 }
 
 export function getToken(): string | null {

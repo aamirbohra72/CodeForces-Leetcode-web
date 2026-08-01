@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useOptionalDashboardSidebar } from '@/contexts/DashboardSidebarContext';
+import { getUser, isAdmin } from '@/lib/auth';
 import { cn } from '@/lib/cn';
 
 interface SidebarItem {
@@ -11,6 +12,7 @@ interface SidebarItem {
   href: string;
   icon?: string;
   badge?: string;
+  staffOnly?: boolean;
 }
 
 const sidebarItems: SidebarItem[] = [
@@ -25,6 +27,7 @@ const sidebarItems: SidebarItem[] = [
   { label: 'Playground', href: '/practice', icon: '💻' },
   { label: 'Interview (JS)', href: '/interview', icon: '🎙️' },
   { label: 'TA Help', href: '/ta-help', icon: '🧑‍🏫' },
+  { label: 'TA Desk', href: '/ta-help/desk', icon: '🎧', staffOnly: true },
   { label: 'Placement Support', href: '/placement', icon: '💼' },
   { label: 'Write a Blog', href: '/blog/write', icon: '✏️' },
   { label: 'DSA Sheet', href: '/dsa-sheet', icon: '📋' },
@@ -40,6 +43,11 @@ export function Sidebar() {
   const isMobile = ctx?.isMobile ?? false;
   const sidebarId = ctx?.sidebarId ?? 'sidebar-panel-static';
   const setOpen = ctx?.setOpen;
+  const staff = isAdmin() || getUser()?.role === 'TA';
+  const visibleItems = useMemo(
+    () => sidebarItems.filter((item) => !item.staffOnly || staff),
+    [staff],
+  );
 
   useEffect(() => {
     if (!isMobile || !setOpen) return;
@@ -59,7 +67,7 @@ export function Sidebar() {
       )}
     >
       <nav aria-label="Dashboard">
-        {sidebarItems.map((item) => {
+        {visibleItems.map((item) => {
           const isActive =
             item.href === '/'
               ? pathname === '/'

@@ -60,7 +60,7 @@ export function ClerkApiBridge() {
 
         const data = (await res.json()) as {
           token: string;
-          user: { id: string; email: string; username: string; role: 'ADMIN' | 'USER' };
+          user: { id: string; email: string; username: string; role: 'ADMIN' | 'USER' | 'TA' };
         };
         setToken(data.token);
         setUser(data.user);

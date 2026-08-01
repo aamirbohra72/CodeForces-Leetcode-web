@@ -94,6 +94,24 @@ export function TaHelpRequestCard({ request, onSatisfied, onRate }: TaHelpReques
               View more
             </button>
           )}
+
+          {(showDetail || expanded) && (request.replies?.length ?? 0) > 0 && (
+            <div className="mt-4 space-y-2 border-t border-[#3a3a3a] pt-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#888]">Replies</p>
+              {request.replies!.map((reply) => (
+                <div
+                  key={reply.id}
+                  className="rounded-lg border border-white/5 bg-[#1a1a1a] px-3 py-2"
+                >
+                  <p className="text-[11px] text-[#777]">
+                    {reply.authorName} · {reply.authorRole} ·{' '}
+                    {formatRelativeTime(reply.createdAt)}
+                  </p>
+                  <p className="mt-1 text-sm text-[#c4c4c4]">{reply.body}</p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="flex w-full shrink-0 flex-col gap-3 lg:w-56">
@@ -117,7 +135,7 @@ export function TaHelpRequestCard({ request, onSatisfied, onRate }: TaHelpReques
             {request.type === 'video' && request.hasRecording ? 'View recording' : 'View request'}
           </button>
 
-          {request.status === 'resolved' && (
+          {(request.status === 'replied' || request.status === 'resolved') && (
             <div className="rounded-lg border border-[#3a3a3a] bg-[#1a1a1a] p-3">
               {request.satisfied == null ? (
                 <>

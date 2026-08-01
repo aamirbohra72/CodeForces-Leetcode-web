@@ -8,11 +8,9 @@ import {
   TaHelpCreateModal,
   type TaHelpCreatePayload,
 } from '@/components/ta-help/TaHelpCreateModal';
-import {
-  appendTaHelpRequest,
-  loadTaHelpRequests,
-  type TaHelpType,
-} from '@/data/ta-help';
+import { createTaHelpRequestApi, fetchMyTaHelpRequests } from '@/lib/taHelpApi';
+import { getToken } from '@/lib/auth';
+import type { TaHelpType } from '@/data/ta-help';
 
 type CompanionAction = {
   type: 'link' | 'ta_help' | 'ta_call';
@@ -104,8 +102,13 @@ export function SupportCompanion({ className }: SupportCompanionProps) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const refreshQueueStats = useCallback(() => {
-    const all = loadTaHelpRequests();
-    setWaitingCalls(all.filter((r) => r.status === 'waiting' && r.type === 'video').length);
+    if (!getToken()) {
+      setWaitingCalls(0);
+      return;
+    }
+    void fetchMyTaHelpRequests()
+      .then((data) => setWaitingCalls(data.waitingVideo || 0))
+      .catch(() => setWaitingCalls(0));
   }, []);
 
   useEffect(() => {
@@ -147,37 +150,48 @@ export function SupportCompanion({ className }: SupportCompanionProps) {
   );
 
   const onCallSubmit = useCallback(
-    (payload: TaHelpCreatePayload) => {
-      const created = appendTaHelpRequest(payload);
-      setCallModalOpen(false);
-      refreshQueueStats();
+    async (payload: TaHelpCreatePayload) => {
+      try {
+        if (!getToken()) {
+          window.location.href = '/sign-in?redirect_url=/';
+          return;
+        }
+        const created = await createTaHelpRequestApi({
+          ...payload,
+          source: 'companion',
+        });
+        setCallModalOpen(false);
+        refreshQueueStats();
 
-      const slotNote = payload.preferredSlot ? ` Preferred slot: ${payload.preferredSlot}.` : '';
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `u-call-${created.id}`,
-          role: 'user',
-          content:
-            payload.type === 'video'
-              ? `Please request a TA video call: ${payload.title}`
-              : `Please raise a TA text request: ${payload.title}`,
-          createdAt: new Date().toISOString(),
-        },
-        {
-          id: `a-call-${created.id}`,
-          role: 'assistant',
-          content:
-            payload.type === 'video'
-              ? `Done — your video call request is in the TA queue (id ${created.id}).${slotNote} Status is Waiting on TA. A teaching assistant will pick it up next.`
-              : `Done — your text help request is in the TA queue (id ${created.id}). Status is Waiting on TA.`,
-          createdAt: new Date().toISOString(),
-          actions: [
-            { type: 'link', label: 'View in TA Help', href: '/ta-help' },
-            { type: 'ta_call', label: 'Request another Call', href: '/ta-help' },
-          ],
-        },
-      ]);
+        const slotNote = payload.preferredSlot ? ` Preferred slot: ${payload.preferredSlot}.` : '';
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `u-call-${created.id}`,
+            role: 'user',
+            content:
+              payload.type === 'video'
+                ? `Please request a TA video call: ${payload.title}`
+                : `Please raise a TA text request: ${payload.title}`,
+            createdAt: new Date().toISOString(),
+          },
+          {
+            id: `a-call-${created.id}`,
+            role: 'assistant',
+            content:
+              payload.type === 'video'
+                ? `Done — your video call request is in the live TA queue (id ${created.id}).${slotNote} Status is Waiting on TA.`
+                : `Done — your text help request is in the live TA queue (id ${created.id}). Status is Waiting on TA.`,
+            createdAt: new Date().toISOString(),
+            actions: [
+              { type: 'link', label: 'View in TA Help', href: '/ta-help' },
+              { type: 'ta_call', label: 'Request another Call', href: '/ta-help' },
+            ],
+          },
+        ]);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Failed to create TA request');
+      }
     },
     [refreshQueueStats],
   );

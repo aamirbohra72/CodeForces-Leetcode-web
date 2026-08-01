@@ -9,6 +9,77 @@ type SmtpConfig = {
   from: string;
 };
 
+type BrevoApiConfig = {
+  kind: 'api';
+  apiKey: string;
+  senderEmail: string;
+  senderName: string;
+};
+
+type BrevoSmtpConfig = {
+  kind: 'smtp';
+  smtp: SmtpConfig;
+  senderEmail: string;
+};
+
+type BrevoConfig = BrevoApiConfig | BrevoSmtpConfig;
+
+export type EmailDeliveryMode = 'brevo' | 'smtp' | 'console';
+
+function extractEmail(from?: string): string | undefined {
+  if (!from) return undefined;
+  const match = from.match(/<([^>]+)>/);
+  return (match?.[1] || from).trim() || undefined;
+}
+
+function getSenderEmail(): string | undefined {
+  return (
+    process.env.BREVO_SENDER_EMAIL?.trim() ||
+    extractEmail(process.env.SMTP_FROM) ||
+    process.env.SMTP_USER?.trim()
+  );
+}
+
+/**
+ * Supports both Brevo key types:
+ * - xkeysib-… → HTTP Transactional API
+ * - xsmtpsib-… → SMTP relay (smtp-relay.brevo.com)
+ */
+function getBrevoConfig(): BrevoConfig | null {
+  const key = process.env.BREVO_API_KEY?.trim();
+  if (!key) return null;
+
+  const senderEmail = getSenderEmail();
+  if (!senderEmail) return null;
+
+  const senderName = process.env.BREVO_SENDER_NAME?.trim() || 'Codeforces Platform';
+
+  // SMTP master key from Brevo "SMTP & API" → SMTP
+  if (key.startsWith('xsmtpsib-')) {
+    const smtpUser = process.env.BREVO_SMTP_LOGIN?.trim() || senderEmail;
+    return {
+      kind: 'smtp',
+      senderEmail,
+      smtp: {
+        host: process.env.SMTP_HOST?.trim() || 'smtp-relay.brevo.com',
+        port: Number(process.env.SMTP_PORT ?? '587'),
+        secure: process.env.SMTP_SECURE === 'true',
+        user: smtpUser,
+        pass: key,
+        from: process.env.SMTP_FROM?.trim() || `${senderName} <${senderEmail}>`,
+      },
+    };
+  }
+
+  // API key from Brevo "SMTP & API" → API keys
+  return {
+    kind: 'api',
+    apiKey: key,
+    senderEmail,
+    senderName,
+  };
+}
+
 function getSmtpConfig(): SmtpConfig | null {
   const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASS;
@@ -33,8 +104,7 @@ function getSmtpConfig(): SmtpConfig | null {
 let transporter: Transporter | null = null;
 
 function getTransporter(config: SmtpConfig): Transporter {
-  if (transporter) return transporter;
-
+  // Reset if config changes between Brevo SMTP vs classic SMTP in the same process.
   transporter = nodemailer.createTransport({
     host: config.host,
     port: config.port,
@@ -49,12 +119,97 @@ function getTransporter(config: SmtpConfig): Transporter {
   return transporter;
 }
 
-export function getEmailDeliveryMode(): 'smtp' | 'console' {
-  return getSmtpConfig() ? 'smtp' : 'console';
+export function getEmailDeliveryMode(): EmailDeliveryMode {
+  if (getBrevoConfig()) return 'brevo';
+  if (getSmtpConfig()) return 'smtp';
+  return 'console';
 }
 
-/** Optional: verifies SMTP credentials on startup (logs only, does not throw). */
+function otpHtml(otp: string): string {
+  return `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h2>Your Login OTP</h2>
+      <p>Your OTP code is: <strong style="font-size: 24px; color: #0070f3;">${otp}</strong></p>
+      <p>This code will expire in 10 minutes.</p>
+      <p>If you didn't request this code, please ignore this email.</p>
+    </div>
+  `;
+}
+
+async function sendViaBrevoApi(
+  config: BrevoApiConfig,
+  to: string,
+  subject: string,
+  htmlContent: string,
+): Promise<void> {
+  const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      accept: 'application/json',
+      'content-type': 'application/json',
+      'api-key': config.apiKey,
+    },
+    body: JSON.stringify({
+      sender: {
+        name: config.senderName,
+        email: config.senderEmail,
+      },
+      to: [{ email: to }],
+      subject,
+      htmlContent,
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Brevo API ${res.status}: ${body.slice(0, 400)}`);
+  }
+}
+
+async function sendWithBrevo(to: string, subject: string, html: string): Promise<void> {
+  const brevo = getBrevoConfig();
+  if (!brevo) throw new Error('Brevo is not configured');
+
+  if (brevo.kind === 'api') {
+    await sendViaBrevoApi(brevo, to, subject, html);
+    return;
+  }
+
+  const mailer = getTransporter(brevo.smtp);
+  await mailer.sendMail({
+    from: brevo.smtp.from,
+    to,
+    subject,
+    html,
+  });
+}
+
+/** Optional: verifies outbound email config on startup (logs only, does not throw). */
 export async function verifySmtpIfConfigured(): Promise<void> {
+  const brevo = getBrevoConfig();
+  if (brevo) {
+    if (brevo.kind === 'api') {
+      const res = await fetch('https://api.brevo.com/v3/account', {
+        headers: {
+          accept: 'application/json',
+          'api-key': brevo.apiKey,
+        },
+      });
+      if (!res.ok) {
+        throw new Error(`Brevo account check failed (${res.status})`);
+      }
+      console.log(`[MAIL] Brevo API OK — sender ${brevo.senderEmail}`);
+      return;
+    }
+
+    const mailer = getTransporter(brevo.smtp);
+    await mailer.verify();
+    console.log(
+      `[MAIL] Brevo SMTP OK — host ${brevo.smtp.host} sender ${brevo.senderEmail}`,
+    );
+    return;
+  }
+
   const config = getSmtpConfig();
   if (!config) return;
   const mailer = getTransporter(config);
@@ -62,47 +217,45 @@ export async function verifySmtpIfConfigured(): Promise<void> {
 }
 
 /**
- * Production guardrail: fail fast when SMTP is not configured correctly.
+ * Production guardrail: fail fast when email is not configured correctly.
  */
 export function assertEmailConfigForRuntime(): void {
   if (process.env.NODE_ENV !== 'production') return;
 
-  const config = getSmtpConfig();
-  if (!config) {
+  if (getEmailDeliveryMode() === 'console') {
     throw new Error(
-      'SMTP is required in production. Set SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASS/SMTP_FROM.',
+      'Email is required in production. Set BREVO_API_KEY + BREVO_SENDER_EMAIL, or SMTP_USER/SMTP_PASS/SMTP_FROM.',
     );
   }
 }
 
 export async function sendOTPEmail(email: string, otp: string): Promise<void> {
-  const config = getSmtpConfig();
+  const mode = getEmailDeliveryMode();
+  const subject = 'Your Login OTP - Codeforces Platform';
+  const html = otpHtml(otp);
 
-  // Local/dev fallback to unblock testing without SMTP setup.
-  if (!config) {
+  if (mode === 'console') {
     if (process.env.NODE_ENV === 'production') {
-      throw new Error(
-        'SMTP is not configured. OTP email cannot be delivered in production.',
-      );
+      throw new Error('Email is not configured. OTP email cannot be delivered in production.');
     }
     console.log(`\n📧 [DEV OTP] ${email}: ${otp}\n`);
     return;
   }
 
   try {
+    if (mode === 'brevo') {
+      await sendWithBrevo(email, subject, html);
+      console.log(`[MAIL] OTP sent via Brevo to ${email}`);
+      return;
+    }
+
+    const config = getSmtpConfig()!;
     const mailer = getTransporter(config);
     const result = await mailer.sendMail({
       from: config.from,
       to: email,
-      subject: 'Your Login OTP - Codeforces Platform',
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2>Your Login OTP</h2>
-          <p>Your OTP code is: <strong style="font-size: 24px; color: #0070f3;">${otp}</strong></p>
-          <p>This code will expire in 10 minutes.</p>
-          <p>If you didn't request this code, please ignore this email.</p>
-        </div>
-      `,
+      subject,
+      html,
     });
     console.log(`[MAIL] OTP sent to ${email}; messageId=${result.messageId}`);
   } catch (error) {
@@ -111,3 +264,32 @@ export async function sendOTPEmail(email: string, otp: string): Promise<void> {
   }
 }
 
+/** Generic transactional send (payments, TA alerts, etc.). */
+export async function sendTransactionalEmail(input: {
+  to: string;
+  subject: string;
+  html: string;
+}): Promise<void> {
+  const mode = getEmailDeliveryMode();
+  if (mode === 'console') {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('Email is not configured');
+    }
+    console.log(`\n📧 [DEV MAIL] to=${input.to} subject=${input.subject}\n`);
+    return;
+  }
+
+  if (mode === 'brevo') {
+    await sendWithBrevo(input.to, input.subject, input.html);
+    return;
+  }
+
+  const config = getSmtpConfig()!;
+  const mailer = getTransporter(config);
+  await mailer.sendMail({
+    from: config.from,
+    to: input.to,
+    subject: input.subject,
+    html: input.html,
+  });
+}

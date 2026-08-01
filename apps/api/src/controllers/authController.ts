@@ -44,11 +44,11 @@ export const authController = {
       await sendOTPEmail(email, otp);
 
       const deliveryMode = getEmailDeliveryMode();
+      const emailed = deliveryMode === 'brevo' || deliveryMode === 'smtp';
       res.json({
-        message:
-          deliveryMode === 'smtp'
-            ? 'OTP sent to your email'
-            : 'OTP ready (email not configured — use dev-only channel)',
+        message: emailed
+          ? 'OTP sent to your email'
+          : 'OTP ready (email not configured — use dev-only channel)',
         expiresIn: 600, // 10 minutes in seconds
         ...(process.env.NODE_ENV !== 'production' && {
           deliveryMode,

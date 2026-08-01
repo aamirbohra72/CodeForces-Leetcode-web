@@ -17,6 +17,7 @@ import { paymentRoutes } from './routes/payments';
 import { projectsRoutes } from './routes/projects';
 import { blogRoutes } from './routes/blog';
 import { companionRoutes } from './routes/companion';
+import { taHelpRoutes } from './routes/taHelp';
 import { connectRedis, disconnectRedis } from './services/redisService';
 import {
   assertEmailConfigForRuntime,
@@ -55,6 +56,7 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/projects', projectsRoutes);
 app.use('/api/blog', blogRoutes);
 app.use('/api/companion', companionRoutes);
+app.use('/api/ta-help', taHelpRoutes);
 app.use('/api/careers', careersRoutes);
 
 // Health check
@@ -84,11 +86,11 @@ const server = app.listen(PORT, () => {
   console.log(`📬 Email delivery mode: ${mode}`);
   if (mode === 'console' && process.env.NODE_ENV !== 'production') {
     console.log(
-      '⚠️  SMTP_USER / SMTP_PASS not set — OTP is NOT emailed. Set SMTP_* in apps/api/.env (or root .env), or use devOtp from /auth/request-otp in dev.',
+      '⚠️  Email not configured — OTP is NOT emailed. Set BREVO_API_KEY + BREVO_SENDER_EMAIL (or SMTP_*) in apps/api/.env, or use devOtp from /auth/request-otp in dev.',
     );
   }
   verifySmtpIfConfigured().catch((err: Error) => {
-    console.error('[MAIL] SMTP verify failed — outgoing mail may not work:', err.message);
+    console.error('[MAIL] Email verify failed — outgoing mail may not work:', err.message);
   });
 });
 

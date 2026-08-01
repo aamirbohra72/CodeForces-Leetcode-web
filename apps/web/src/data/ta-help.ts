@@ -1,6 +1,6 @@
 /**
- * Teaching Assistant help requests — client-persisted for now.
- * Replace with API/DB when TA queue goes live.
+ * Teaching Assistant help — shared types + UI helpers.
+ * Persistence is via /api/ta-help (Neon).
  */
 
 export type TaHelpStatus = 'waiting' | 'replied' | 'resolved' | 'open_pool';
@@ -11,19 +11,34 @@ export type TaHelpRequest = {
   title: string;
   type: TaHelpType;
   status: TaHelpStatus;
+  dbStatus?: string;
   problem: string;
   topic: string;
   language: string;
   description: string;
+  preferredSlot?: string | null;
+  source?: string;
   assignedTo: string | null;
+  assignedToId?: string | null;
+  userId?: string;
+  learnerUsername?: string | null;
+  learnerEmail?: string | null;
   createdAt: string;
+  updatedAt?: string;
+  claimedAt?: string | null;
+  resolvedAt?: string | null;
   commentCount: number;
   rating: number | null;
   satisfied: boolean | null;
   hasRecording?: boolean;
+  replies?: Array<{
+    id: string;
+    body: string;
+    authorRole: string;
+    authorName: string;
+    createdAt: string;
+  }>;
 };
-
-export const TA_HELP_STORAGE_KEY = 'ta-help:requests';
 
 export const TA_HELP_TABS: Array<{ id: TaHelpStatus; label: string }> = [
   { id: 'waiting', label: 'Waiting on TA' },
@@ -53,96 +68,6 @@ export const TA_HELP_LANGUAGES = [
   'N/A',
 ] as const;
 
-export const SEED_TA_HELP_REQUESTS: TaHelpRequest[] = [
-  {
-    id: 'hr-1',
-    title: 'Facing compilation error',
-    type: 'text',
-    status: 'resolved',
-    problem: 'Employee Table Creation',
-    topic: 'SQL',
-    language: 'SQL',
-    description:
-      'Getting a syntax error when creating the employees table with foreign keys. Need help debugging the CREATE TABLE statement.',
-    assignedTo: 'Deeksha Sharma',
-    createdAt: daysAgo(5),
-    commentCount: 1,
-    rating: null,
-    satisfied: null,
-  },
-  {
-    id: 'hr-2',
-    title: 'Assignment / homework questions',
-    type: 'video',
-    status: 'resolved',
-    problem: 'Change Payment Gateway',
-    topic: 'LLD',
-    language: 'Java',
-    description:
-      'I have not done this kind of question earlier. Need a walkthrough of the payment gateway redesign assignment.',
-    assignedTo: 'Tarun Jain',
-    createdAt: daysAgo(210),
-    commentCount: 3,
-    rating: 5,
-    satisfied: true,
-    hasRecording: true,
-  },
-  {
-    id: 'hr-3',
-    title: 'Stuck on binary search edge case',
-    type: 'text',
-    status: 'waiting',
-    problem: 'Search Insert Position',
-    topic: 'DSA',
-    language: 'JavaScript',
-    description:
-      'My binary search fails on empty arrays and when the target is larger than all elements. Looking for the correct mid update pattern.',
-    assignedTo: null,
-    createdAt: daysAgo(0),
-    commentCount: 0,
-    rating: null,
-    satisfied: null,
-  },
-  {
-    id: 'hr-4',
-    title: 'React useEffect infinite loop',
-    type: 'text',
-    status: 'replied',
-    problem: 'Dashboard Data Fetch',
-    topic: 'React',
-    language: 'TypeScript',
-    description:
-      'Fetching course progress in useEffect retriggers endlessly. Shared a codesandbox in the request body.',
-    assignedTo: 'Ananya Verma',
-    createdAt: daysAgo(1),
-    commentCount: 2,
-    rating: null,
-    satisfied: null,
-  },
-  {
-    id: 'hr-5',
-    title: 'Need second opinion on HLD tradeoffs',
-    type: 'video',
-    status: 'open_pool',
-    problem: 'EdTech Live Class Design',
-    topic: 'System Design',
-    language: 'N/A',
-    description:
-      'Open pool request for WebSocket vs WebRTC for live coding classrooms. Waiting for any available TA.',
-    assignedTo: null,
-    createdAt: daysAgo(2),
-    commentCount: 0,
-    rating: null,
-    satisfied: null,
-  },
-];
-
-function daysAgo(n: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() - n);
-  return d.toISOString();
-}
-
 export function formatRelativeTime(iso: string): string {
   const then = new Date(iso).getTime();
   const now = Date.now();
@@ -163,65 +88,5 @@ export function countByStatus(requests: TaHelpRequest[]): Record<TaHelpStatus, n
     replied: requests.filter((r) => r.status === 'replied').length,
     resolved: requests.filter((r) => r.status === 'resolved').length,
     open_pool: requests.filter((r) => r.status === 'open_pool').length,
-  };
-}
-
-export function loadTaHelpRequests(): TaHelpRequest[] {
-  if (typeof window === 'undefined') return SEED_TA_HELP_REQUESTS;
-  try {
-    const raw = localStorage.getItem(TA_HELP_STORAGE_KEY);
-    if (!raw) {
-      localStorage.setItem(TA_HELP_STORAGE_KEY, JSON.stringify(SEED_TA_HELP_REQUESTS));
-      return SEED_TA_HELP_REQUESTS;
-    }
-    const parsed = JSON.parse(raw) as TaHelpRequest[];
-    return Array.isArray(parsed) ? parsed : SEED_TA_HELP_REQUESTS;
-  } catch {
-    return SEED_TA_HELP_REQUESTS;
-  }
-}
-
-export function saveTaHelpRequests(requests: TaHelpRequest[]): void {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(TA_HELP_STORAGE_KEY, JSON.stringify(requests));
-  window.dispatchEvent(new CustomEvent('ta-help:updated', { detail: { requests } }));
-}
-
-export function appendTaHelpRequest(input: {
-  title: string;
-  type: TaHelpType;
-  problem: string;
-  topic: string;
-  language: string;
-  description: string;
-}): TaHelpRequest {
-  const created = createTaHelpRequest(input);
-  const existing = loadTaHelpRequests();
-  saveTaHelpRequests([created, ...existing]);
-  return created;
-}
-
-export function createTaHelpRequest(input: {
-  title: string;
-  type: TaHelpType;
-  problem: string;
-  topic: string;
-  language: string;
-  description: string;
-}): TaHelpRequest {
-  return {
-    id: `hr-${Date.now()}`,
-    title: input.title.trim(),
-    type: input.type,
-    status: 'waiting',
-    problem: input.problem.trim(),
-    topic: input.topic,
-    language: input.language,
-    description: input.description.trim(),
-    assignedTo: null,
-    createdAt: new Date().toISOString(),
-    commentCount: 0,
-    rating: null,
-    satisfied: null,
   };
 }
