@@ -8,6 +8,12 @@ import { api } from '@/lib/api';
 import { getToken } from '@/lib/auth';
 import { isLocallyEnrolled, markLocalEnrollment } from '@/lib/enrollment';
 import { startRazorpayCheckout } from '@/lib/razorpayCheckout';
+import {
+  completeLearningItem,
+  fetchCourseProgress,
+} from '@/lib/learningProgress';
+import { CATALOG_TOTALS } from '@/types/learning-progress';
+import { markCourseCompleted } from '@/lib/certificates';
 import { getAssignmentsForCourse } from '@/data/assignments';
 import { getTutorialsForCourse } from '@/data/tutorials/system-design';
 import { isLlmDrivenCourse, type LlmCoursePack } from '@/types/llm-course';
@@ -96,6 +102,22 @@ export default function CourseDetailPage() {
   const [llmPack, setLlmPack] = useState<LlmCoursePack | null>(null);
   const [llmLoading, setLlmLoading] = useState(false);
   const [llmError, setLlmError] = useState('');
+  const [percent, setPercent] = useState(0);
+  const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
+  const [markingId, setMarkingId] = useState<string | null>(null);
+
+  const refreshProgress = async () => {
+    if (!getToken()) return;
+    try {
+      const progress = await fetchCourseProgress(courseId);
+      if (!progress) return;
+      setPercent(progress.percent);
+      setCompletedIds(new Set(progress.items?.filter((i) => i.completed).map((i) => i.itemId) || []));
+      if (progress.completed) markCourseCompleted(courseId);
+    } catch {
+      /* ignore */
+    }
+  };
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -115,6 +137,8 @@ export default function CourseDetailPage() {
       })
       .catch(() => undefined);
 
+    void refreshProgress();
+
     const onEnrollment = (event: Event) => {
       const detail = (event as CustomEvent).detail as
         | { productId?: string; productIds?: string[] }
@@ -127,11 +151,17 @@ export default function CourseDetailPage() {
         setEnrolled(true);
       }
     };
+    const onProgress = () => {
+      void refreshProgress();
+    };
     window.addEventListener('enrollment:updated', onEnrollment);
+    window.addEventListener('learning-progress:updated', onProgress);
     return () => {
       cancelled = true;
       window.removeEventListener('enrollment:updated', onEnrollment);
+      window.removeEventListener('learning-progress:updated', onProgress);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [courseId]);
 
   useEffect(() => {
@@ -184,33 +214,65 @@ export default function CourseDetailPage() {
       id: t.id,
       title: t.title,
       duration: t.duration,
-      completed: false,
+      completed: completedIds.has(t.id),
       problemCount: t.questions.length,
       href: `/learn/${courseId}/tutorials/${t.id}`,
       assignmentHref: `/learn/${courseId}/tutorials/${t.id}?tab=assignment`,
       live: true as boolean,
+      itemType: 'tutorial' as const,
     })) ??
     (staticTutorials.length > 0
       ? staticTutorials.map((t) => ({
           id: t.id,
           title: t.title,
           duration: t.duration,
-          completed: false,
+          completed: completedIds.has(t.id),
           problemCount: t.questionIds.length,
           href: `/learn/${courseId}/tutorials/${t.id}`,
           assignmentHref: `/learn/${courseId}/tutorials/${t.id}?tab=assignment`,
           live: false as boolean,
+          itemType: 'tutorial' as const,
         }))
       : (course?.modules ?? []).map((m) => ({
           id: m.id,
           title: m.title,
           duration: m.duration,
-          completed: m.completed,
+          completed: completedIds.has(m.id) || m.completed,
           problemCount: 0,
           href: `/learn/${courseId}`,
           assignmentHref: `/learn/${courseId}/assignments`,
           live: false as boolean,
+          itemType: 'module' as const,
         })));
+
+  const markItemComplete = async (item: (typeof tutorialList)[number]) => {
+    if (!getToken()) {
+      window.location.href = `/sign-in?redirect_url=/learn/${courseId}`;
+      return;
+    }
+    setMarkingId(item.id);
+    try {
+      const totalCount = Math.max(
+        tutorialList.length,
+        CATALOG_TOTALS[courseId] || tutorialList.length || 1,
+      );
+      await completeLearningItem({
+        courseId,
+        courseKind: 'catalog',
+        title: course.title,
+        itemId: item.id,
+        itemType: item.itemType,
+        itemTitle: item.title,
+        itemHref: item.href,
+        totalCount,
+      });
+      await refreshProgress();
+    } catch (e) {
+      setEnrollError(e instanceof Error ? e.message : 'Failed to save progress');
+    } finally {
+      setMarkingId(null);
+    }
+  };
 
   if (!course) {
     return (
@@ -269,9 +331,27 @@ export default function CourseDetailPage() {
             </div>
 
             <h1 style={{ fontSize: '2.5rem', marginBottom: '1rem', fontWeight: 700 }}>{course.title.toUpperCase()}</h1>
-            <p style={{ fontSize: '1.1rem', color: '#b0b0b0', lineHeight: 1.6, marginBottom: '2rem' }}>
+            <p style={{ fontSize: '1.1rem', color: '#b0b0b0', lineHeight: 1.6, marginBottom: '1rem' }}>
               {course.description}
             </p>
+            {enrolled ? (
+              <div style={{ marginBottom: '1.5rem', maxWidth: 420 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#94a3b8', marginBottom: 6 }}>
+                  <span>Course progress</span>
+                  <span style={{ color: '#86efac', fontWeight: 700 }}>{percent}%</span>
+                </div>
+                <div style={{ height: 8, borderRadius: 999, background: '#2a2a2a', overflow: 'hidden' }}>
+                  <div
+                    style={{
+                      width: `${percent}%`,
+                      height: '100%',
+                      background: 'linear-gradient(90deg, #22c55e, #34d399)',
+                      transition: 'width 0.3s ease',
+                    }}
+                  />
+                </div>
+              </div>
+            ) : null}
 
             <button
               onClick={() => void enroll()}
@@ -425,19 +505,40 @@ export default function CourseDetailPage() {
                         </p>
                       </div>
                     </div>
-                    <Link
-                      href={module.href}
-                      style={{
-                        padding: '0.5rem 1.5rem',
-                        background: '#22c55e',
-                        color: 'white',
-                        borderRadius: 6,
-                        fontWeight: 600,
-                        textDecoration: 'none',
-                      }}
-                    >
-                      {module.completed ? 'Review' : 'Start'}
-                    </Link>
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                      {!module.completed ? (
+                        <button
+                          type="button"
+                          disabled={markingId === module.id}
+                          onClick={() => void markItemComplete(module)}
+                          style={{
+                            padding: '0.5rem 1rem',
+                            background: 'transparent',
+                            color: '#86efac',
+                            border: '1px solid rgba(52,211,153,0.4)',
+                            borderRadius: 6,
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            opacity: markingId === module.id ? 0.6 : 1,
+                          }}
+                        >
+                          {markingId === module.id ? 'Saving…' : 'Mark done'}
+                        </button>
+                      ) : null}
+                      <Link
+                        href={module.href}
+                        style={{
+                          padding: '0.5rem 1.5rem',
+                          background: '#22c55e',
+                          color: 'white',
+                          borderRadius: 6,
+                          fontWeight: 600,
+                          textDecoration: 'none',
+                        }}
+                      >
+                        {module.completed ? 'Review' : 'Start'}
+                      </Link>
+                    </div>
                   </div>
                 ))}
               </div>

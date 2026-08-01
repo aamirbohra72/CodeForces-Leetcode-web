@@ -5,9 +5,13 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { DashboardShell } from '@/components/DashboardShell';
 import { api } from '@/lib/api';
+import { getToken } from '@/lib/auth';
+import { completeLearningItem } from '@/lib/learningProgress';
+import { CATALOG_TOTALS } from '@/types/learning-progress';
 import {
   getHldQuestionsByIds,
   getTutorial,
+  getTutorialsForCourse,
   loadProgress,
   type PracticeProgress,
 } from '@/data/tutorials/system-design';
@@ -94,6 +98,9 @@ export default function TutorialSessionPage() {
   const [flashIndex, setFlashIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [notesExpanded, setNotesExpanded] = useState(false);
+  const [savingProgress, setSavingProgress] = useState(false);
+  const [progressSaved, setProgressSaved] = useState(false);
+  const [progressError, setProgressError] = useState('');
   const [tutorial, setTutorial] = useState<UiTutorial | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -194,6 +201,41 @@ export default function TutorialSessionPage() {
     window.open(tutorial.recordingUrl || 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', '_blank');
   };
 
+  const markTutorialComplete = async () => {
+    if (!tutorial) return;
+    if (!getToken()) {
+      window.location.href = `/sign-in?redirect_url=/learn/${courseId}/tutorials/${tutorialId}`;
+      return;
+    }
+    setSavingProgress(true);
+    setProgressError('');
+    try {
+      const totalCount = Math.max(
+        getTutorialsForCourse(courseId).length,
+        CATALOG_TOTALS[courseId] || 1,
+      );
+      await completeLearningItem({
+        courseId,
+        courseKind: 'catalog',
+        title: tutorial.title,
+        itemId: tutorialId,
+        itemType: 'tutorial',
+        itemTitle: tutorial.title,
+        itemHref: `/learn/${courseId}/tutorials/${tutorialId}`,
+        totalCount,
+        score:
+          questions.length > 0
+            ? Math.round((correctCount / Math.max(questions.length, 1)) * 100)
+            : undefined,
+      });
+      setProgressSaved(true);
+    } catch (e) {
+      setProgressError(e instanceof Error ? e.message : 'Failed to save progress');
+    } finally {
+      setSavingProgress(false);
+    }
+  };
+
   return (
     <DashboardShell mainClassName="min-h-0 overflow-y-auto p-0">
       <div className={styles.wrap}>
@@ -218,7 +260,25 @@ export default function TutorialSessionPage() {
               <span className={styles.statPill}>
                 Score {earned}/{maxMarks}
               </span>
+              <button
+                type="button"
+                className={styles.statPill}
+                style={{
+                  cursor: 'pointer',
+                  border: '1px solid rgba(52,211,153,0.45)',
+                  background: progressSaved ? 'rgba(34,197,94,0.25)' : 'rgba(34,197,94,0.12)',
+                  color: '#86efac',
+                  fontWeight: 700,
+                }}
+                disabled={savingProgress || progressSaved}
+                onClick={() => void markTutorialComplete()}
+              >
+                {progressSaved ? '✓ Saved to progress' : savingProgress ? 'Saving…' : 'Mark tutorial done'}
+              </button>
             </div>
+            {progressError ? (
+              <p style={{ color: '#f87171', fontSize: 13, marginTop: 8 }}>{progressError}</p>
+            ) : null}
           </div>
         </header>
 

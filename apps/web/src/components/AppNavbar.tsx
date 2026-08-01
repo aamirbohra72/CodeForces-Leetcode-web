@@ -4,8 +4,9 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from '@clerk/nextjs';
-import { getUser, isAdmin } from '@/lib/auth';
+import { getUser, getToken, isAdmin } from '@/lib/auth';
 import { cn } from '@/lib/cn';
+import { api } from '@/lib/api';
 import { SidebarTrigger } from '@/components/SidebarTrigger';
 import { SupportCompanion } from '@/components/support/SupportCompanion';
 
@@ -64,8 +65,24 @@ export function AppNavbar({ className, activeHref, activePage }: AppNavbarProps)
     refreshLocalProfile();
     const onAuth = () => refreshLocalProfile();
     window.addEventListener('auth-changed', onAuth);
-    return () => window.removeEventListener('auth-changed', onAuth);
+    window.addEventListener('learning-progress:updated', onAuth);
+    return () => {
+      window.removeEventListener('auth-changed', onAuth);
+      window.removeEventListener('learning-progress:updated', onAuth);
+    };
   }, [refreshLocalProfile]);
+
+  useEffect(() => {
+    if (!getToken()) return;
+    void api
+      .get<{ streak: { currentStreak: number } }>('/progress/me')
+      .then((data) => {
+        const n = data.streak?.currentStreak || 0;
+        localStorage.setItem('streak', String(n));
+        setStreak(n);
+      })
+      .catch(() => undefined);
+  }, []);
 
   return (
     <nav

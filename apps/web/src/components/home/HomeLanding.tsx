@@ -1,5 +1,9 @@
+'use client';
+
 import Link from 'next/link';
+import { SignedIn, SignedOut } from '@clerk/nextjs';
 import { cn } from '@/lib/cn';
+import { ContinueLearningBanner } from '@/components/home/ContinueLearningBanner';
 
 const quickLinks = [
   {
@@ -83,7 +87,6 @@ function ActionCard({
 export function HomeLanding() {
   return (
     <div className="scroll-smooth pb-16">
-      {/* Hero */}
       <section className="relative overflow-hidden border-b border-[#2a2a2a] px-6 py-12 sm:px-8 lg:px-10 lg:py-16">
         <div
           className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-10%,rgba(34,197,94,0.12),transparent)]"
@@ -95,7 +98,9 @@ export function HomeLanding() {
             Codeforces Platform
           </p>
           <h1 className="font-nav-brand text-4xl font-bold leading-tight text-white sm:text-5xl lg:text-6xl">
-            Welcome back. <span className="text-green-400">Ship faster.</span> Compete smarter.
+            <SignedIn>Welcome back.</SignedIn>
+            <SignedOut>Build. Compete.</SignedOut>{' '}
+            <span className="text-green-400">Ship faster.</span> Compete smarter.
           </h1>
           <p className="mx-auto mt-5 max-w-2xl text-lg text-[#b0b0b0]">
             A competitive programming hub for contests, curated courses, and daily practice — styled for focus, built for
@@ -114,17 +119,20 @@ export function HomeLanding() {
             >
               Start practicing
             </Link>
-            <Link
-              href="/sign-in"
-              className="inline-flex rounded-lg px-6 py-3 text-sm font-semibold text-[#b0b0b0] transition hover:text-white"
-            >
-              Login
-            </Link>
+            <SignedOut>
+              <Link
+                href="/sign-in"
+                className="inline-flex rounded-lg px-6 py-3 text-sm font-semibold text-[#b0b0b0] transition hover:text-white"
+              >
+                Login
+              </Link>
+            </SignedOut>
           </div>
         </div>
       </section>
 
-      {/* Quick actions */}
+      <ContinueLearningBanner />
+
       <section className="px-6 py-12 sm:px-8 lg:px-10">
         <div className="mb-8 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
@@ -139,7 +147,6 @@ export function HomeLanding() {
         </div>
       </section>
 
-      {/* Bottom CTA strip */}
       <section className="mx-6 rounded-xl border border-[#3a3a3a] bg-[#252525] px-6 py-8 sm:mx-8 lg:mx-10">
         <div className="flex flex-col items-center justify-between gap-4 text-center sm:flex-row sm:text-left">
           <div>

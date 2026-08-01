@@ -2,13 +2,17 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useUser } from '@clerk/nextjs';
 import { DashboardShell } from '@/components/DashboardShell';
 import { downloadCertificatePdf } from '@/components/certificates/downloadCertificatePdf';
-import { getUser } from '@/lib/auth';
+import { getUser, getToken } from '@/lib/auth';
+import { resolveCertificateRecipientName } from '@/lib/certificateName';
 import {
   type CertificateStatus,
   resolveCertificateCourses,
 } from '@/lib/certificates';
+import { fetchLearningSummary } from '@/lib/learningProgress';
+import { markLocalEnrollments } from '@/lib/enrollment';
 
 type CourseRow = ReturnType<typeof resolveCertificateCourses>[number];
 
@@ -26,13 +30,34 @@ function buttonColors(status: CertificateStatus): { bg: string; hover: string } 
 
 export default function CertificatesPage() {
   const router = useRouter();
+  const { user: clerkUser } = useUser();
   const [isModalOpen, setIsModalOpen] = useState(true);
   const [courses, setCourses] = useState<CourseRow[]>([]);
   const [generatingId, setGeneratingId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   const refreshCourses = useCallback(() => {
-    setCourses(resolveCertificateCourses());
+    if (!getToken()) {
+      setCourses(resolveCertificateCourses());
+      return;
+    }
+    void fetchLearningSummary()
+      .then((summary) => {
+        if (!summary) {
+          setCourses(resolveCertificateCourses());
+          return;
+        }
+        const enrolledIds = new Set(summary.enrollments.map((e) => e.productId));
+        markLocalEnrollments([...enrolledIds]);
+        const progressByProduct = new Map(
+          summary.courses.map((c) => [
+            c.courseId,
+            { percent: c.percent, completed: c.completed },
+          ]),
+        );
+        setCourses(resolveCertificateCourses({ enrolledIds, progressByProduct }));
+      })
+      .catch(() => setCourses(resolveCertificateCourses()));
   }, []);
 
   useEffect(() => {
@@ -69,8 +94,17 @@ export default function CertificatesPage() {
     if (course.status === 'eligible') {
       setGeneratingId(course.id);
       try {
-        const user = getUser();
-        const recipientName = user?.username || user?.email?.split('@')[0] || 'Learner';
+        const localUser = getUser();
+        const recipientName = resolveCertificateRecipientName({
+          firstName: clerkUser?.firstName,
+          lastName: clerkUser?.lastName,
+          fullName: clerkUser?.fullName,
+          email:
+            clerkUser?.primaryEmailAddress?.emailAddress ||
+            localUser?.email ||
+            null,
+          username: localUser?.username,
+        });
         downloadCertificatePdf({
           recipientName,
           courseTitle: course.title,

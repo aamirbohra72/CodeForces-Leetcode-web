@@ -7,6 +7,8 @@ import { api } from '@/lib/api';
 import { getToken } from '@/lib/auth';
 import { markLocalEnrollment, markLocalEnrollments } from '@/lib/enrollment';
 import { startRazorpayCheckout } from '@/lib/razorpayCheckout';
+import { fetchLearningSummary } from '@/lib/learningProgress';
+import type { CourseLearningProgress } from '@/types/learning-progress';
 
 interface Course {
   id: string;
@@ -105,17 +107,27 @@ export default function LearnPage() {
   const [enrolledIds, setEnrolledIds] = useState<Set<string>>(new Set());
   const [payingId, setPayingId] = useState<string | null>(null);
   const [payError, setPayError] = useState('');
+  const [progressById, setProgressById] = useState<Record<string, number>>({});
 
   useEffect(() => {
     if (!getToken()) return;
 
     const loadEnrollments = () => {
-      void api
-        .get<{ enrollments: Array<{ productId: string }> }>('/payments/enrollments')
-        .then((data) => {
+      void Promise.all([
+        api.get<{ enrollments: Array<{ productId: string }> }>('/payments/enrollments'),
+        fetchLearningSummary(),
+      ])
+        .then(([data, summary]) => {
           const ids = data.enrollments.map((e) => e.productId);
           setEnrolledIds(new Set(ids));
           markLocalEnrollments(ids);
+          if (summary) {
+            const map: Record<string, number> = {};
+            for (const c of summary.courses as CourseLearningProgress[]) {
+              map[c.courseId] = c.percent;
+            }
+            setProgressById(map);
+          }
         })
         .catch(() => undefined);
     };
@@ -125,9 +137,11 @@ export default function LearnPage() {
     const onEnrollment = () => loadEnrollments();
     window.addEventListener('enrollment:updated', onEnrollment);
     window.addEventListener('focus', onEnrollment);
+    window.addEventListener('learning-progress:updated', onEnrollment);
     return () => {
       window.removeEventListener('enrollment:updated', onEnrollment);
       window.removeEventListener('focus', onEnrollment);
+      window.removeEventListener('learning-progress:updated', onEnrollment);
     };
   }, []);
 
@@ -581,11 +595,44 @@ export default function LearnPage() {
                         color: '#b0b0b0',
                         fontSize: '0.9rem',
                         lineHeight: '1.6',
-                        marginBottom: '1.5rem',
+                        marginBottom: '1rem',
                       }}
                     >
                       {course.description}
                     </p>
+
+                    {typeof progressById[course.id] === 'number' ? (
+                      <div style={{ marginBottom: '1rem' }}>
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            fontSize: '0.75rem',
+                            color: '#94a3b8',
+                            marginBottom: 4,
+                          }}
+                        >
+                          <span>Progress</span>
+                          <span style={{ color: '#86efac' }}>{progressById[course.id]}%</span>
+                        </div>
+                        <div
+                          style={{
+                            height: 6,
+                            borderRadius: 999,
+                            background: '#333',
+                            overflow: 'hidden',
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: `${progressById[course.id]}%`,
+                              height: '100%',
+                              background: '#22c55e',
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ) : null}
 
                     <button
                       style={{
@@ -618,7 +665,9 @@ export default function LearnPage() {
                     >
                       {course.isPremium
                         ? enrolledIds.has(course.id)
-                          ? 'Open Course'
+                          ? progressById[course.id]
+                            ? `Continue · ${progressById[course.id]}%`
+                            : 'Open Course'
                           : payingId === course.id
                             ? 'Opening checkout…'
                             : 'Buy & Enroll'

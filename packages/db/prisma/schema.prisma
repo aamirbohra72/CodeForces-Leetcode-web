@@ -72,6 +72,8 @@ model User {
   topicProgress        Progress[]
   paymentOrders        PaymentOrder[]
   enrollments          Enrollment[]
+  courseLearning       CourseLearningProgress[]
+  learningStreak       LearningStreak?
 
   @@index([email])
   @@index([username])
@@ -380,4 +382,58 @@ model Enrollment {
   @@unique([userId, productId])
   @@index([userId])
   @@index([productId])
+}
+
+/// Aggregated progress for catalog (/learn/:id) or generated notebook courses.
+model CourseLearningProgress {
+  id             String   @id @default(cuid())
+  userId         String
+  courseId       String
+  courseKind     String   @default("catalog") // catalog | generated
+  title          String?
+  completedCount Int      @default(0)
+  totalCount     Int      @default(0)
+  percent        Int      @default(0)
+  completed      Boolean  @default(false)
+  lastItemId     String?
+  lastItemTitle  String?
+  lastItemHref   String?
+  lastActivityAt DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user  User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items CourseLearningItem[]
+
+  @@unique([userId, courseId])
+  @@index([userId, lastActivityAt])
+  @@index([courseId])
+}
+
+model CourseLearningItem {
+  id          String    @id @default(cuid())
+  progressId  String
+  itemId      String
+  itemType    String // tutorial | module | topic | assignment
+  title       String?
+  completed   Boolean   @default(false)
+  score       Int?
+  completedAt DateTime?
+  updatedAt   DateTime  @updatedAt
+
+  progress CourseLearningProgress @relation(fields: [progressId], references: [id], onDelete: Cascade)
+
+  @@unique([progressId, itemId])
+  @@index([progressId])
+}
+
+model LearningStreak {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  currentStreak  Int      @default(0)
+  longestStreak  Int      @default(0)
+  lastActiveDate String? // YYYY-MM-DD (UTC)
+  updatedAt      DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

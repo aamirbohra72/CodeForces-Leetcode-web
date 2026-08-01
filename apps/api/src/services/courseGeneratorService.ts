@@ -1,4 +1,5 @@
 import { prisma } from '@codeforces/db';
+import { syncGeneratedTopicProgress } from './learningProgressService';
 import {
   generateCourseStructure,
   generateMCQs,
@@ -359,6 +360,8 @@ export async function markTopicComplete(userId: string, topicId: string): Promis
     create: { userId, topicId, completed: true },
     update: { completed: true },
   });
+
+  await syncGeneratedTopicProgress(userId, topicId);
 }
 
 export interface QuizResult {
@@ -409,6 +412,9 @@ export async function scoreQuiz(
       where: { userId_topicId: { userId, topicId } },
       create: { userId, topicId, completed: true, score },
       update: { completed: true, score },
+    });
+    await syncGeneratedTopicProgress(userId, topicId, {
+      score: Math.round((score / Math.max(total, 1)) * 100),
     });
   }
 
