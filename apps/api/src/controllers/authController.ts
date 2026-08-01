@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { prisma } from '@codeforces/db';
 import { generateToken, generateOTP, getOTPExpiry, isOTPExpired } from '@codeforces/auth';
 import { getEmailDeliveryMode, sendOTPEmail } from '../services/emailService';
+import { exchangeClerkSession } from '../services/clerkAuthService';
+import { AuthRequest } from '../middleware/auth';
 
 const requestOTPSchema = z.object({
   email: z.string().email(),
@@ -140,6 +142,27 @@ export const authController = {
         return;
       }
       throw error;
+    }
+  },
+
+  async clerkExchange(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const authHeader = req.headers.authorization;
+      if (!authHeader?.startsWith('Bearer ')) {
+        res.status(401).json({ error: 'Clerk session token required' });
+        return;
+      }
+      const clerkJwt = authHeader.slice(7);
+      const result = await exchangeClerkSession(clerkJwt);
+      res.json(result);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Clerk exchange failed';
+      if (msg.includes('CLERK_SECRET_KEY')) {
+        res.status(503).json({ error: 'Clerk is not configured' });
+        return;
+      }
+      console.error('[auth] clerkExchange failed:', error);
+      res.status(401).json({ error: 'Invalid Clerk session', message: msg });
     }
   },
 };

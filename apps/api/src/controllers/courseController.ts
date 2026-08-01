@@ -14,6 +14,7 @@ import {
   listGeneratedCoursesForUser,
   type SourceType,
 } from '../services/courseGeneratorService';
+import { userHasEnrollment } from '../services/productCatalog';
 
 function mapError(err: unknown): { status: number; message: string } {
   const msg = err instanceof Error ? err.message : 'Unknown error';
@@ -66,6 +67,16 @@ export const courseController = {
 
       console.log('[courses] generate started for user', req.user.userId);
       const body = generateBodySchema.parse(req.body);
+
+      const hasAiCredit = await userHasEnrollment(req.user.userId, 'ai-generate');
+      if (!hasAiCredit) {
+        res.status(402).json({
+          error: 'AI course credit required. Buy it on the Billing page, then try again.',
+          code: 'AI_CREDIT_REQUIRED',
+        });
+        return;
+      }
+
       const course = await generateAndPersistCourse({
         sourceType: body.sourceType as SourceType,
         sourceContent: body.sourceContent,

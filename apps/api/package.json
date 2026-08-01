@@ -13,6 +13,7 @@
     "judge:build": "docker build -t codeforces-judge:1 ./judge"
   },
   "dependencies": {
+    "@clerk/backend": "^3.15.0",
     "@codeforces/auth": "file:../../packages/auth",
     "@codeforces/db": "file:../../packages/db",
     "@codeforces/types": "file:../../packages/types",
@@ -23,6 +24,7 @@
     "multer": "^2.1.1",
     "nodemailer": "^6.9.8",
     "pdf-parse": "^1.1.1",
+    "razorpay": "^2.9.8",
     "redis": "^4.6.12",
     "zod": "^3.22.4"
   },

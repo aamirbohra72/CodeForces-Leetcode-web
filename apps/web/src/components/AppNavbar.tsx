@@ -3,19 +3,15 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import { getUser, isAdmin, logout } from '@/lib/auth';
+import { SignedIn, SignedOut, SignInButton, UserButton, useClerk } from '@clerk/nextjs';
+import { getUser, isAdmin } from '@/lib/auth';
+import { clearLocalAuth } from '@/components/ClerkApiBridge';
 import { cn } from '@/lib/cn';
 import { SidebarTrigger } from '@/components/SidebarTrigger';
 
 export type AppNavbarProps = {
-  /** Extra classes on the outer `<nav>` (e.g. sticky top-0 z-50). */
   className?: string;
-  /**
-   * When set, highlights this href instead of inferring from the current pathname.
-   * Use for special layouts or Storybook.
-   */
   activeHref?: string;
-  /** Same as `activeHref` (alternative prop name). */
   activePage?: string;
 };
 
@@ -31,7 +27,6 @@ const PRIMARY_LINKS = [
   { href: '/referral', label: 'Referral' },
 ] as const;
 
-/** Match route segment: exact for leaderboard, prefix for nested routes. */
 function linkIsActive(pathname: string, href: string, override?: string) {
   if (override) {
     return override === href || (href !== '/' && override.startsWith(href));
@@ -53,6 +48,7 @@ function linkIsActive(pathname: string, href: string, override?: string) {
 export function AppNavbar({ className, activeHref, activePage }: AppNavbarProps) {
   const pathname = usePathname() ?? '';
   const resolvedActive = activeHref ?? activePage;
+  const { signOut } = useClerk();
   const [user, setUser] = useState<ReturnType<typeof getUser>>(null);
   const [isAdminUser, setIsAdminUser] = useState(false);
   const [streak, setStreak] = useState(0);
@@ -66,18 +62,18 @@ export function AppNavbar({ className, activeHref, activePage }: AppNavbarProps)
 
   useEffect(() => {
     refreshUser();
-  }, [refreshUser]);
-
-  useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === 'streak' || e.key === null) refreshUser();
+    const onAuth = () => refreshUser();
+    window.addEventListener('auth-changed', onAuth);
+    window.addEventListener('storage', onAuth);
+    return () => {
+      window.removeEventListener('auth-changed', onAuth);
+      window.removeEventListener('storage', onAuth);
     };
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
   }, [refreshUser]);
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    clearLocalAuth();
+    await signOut({ redirectUrl: '/' });
     refreshUser();
   };
 
@@ -120,37 +116,37 @@ export function AppNavbar({ className, activeHref, activePage }: AppNavbarProps)
         </div>
 
         <div className="relative z-10 ml-auto flex shrink-0 items-center gap-x-1 bg-nav-bg sm:gap-x-3">
-          {user ? (
-            <>
-              {isAdminUser && (
-                <Link
-                  href="/admin/dashboard"
-                  className={cn(
-                    'rounded-md px-2.5 py-1.5 text-sm font-medium text-white/90 hover:bg-white/5 hover:text-white',
-                    pathname.startsWith('/admin') && 'bg-white/10 text-green-400',
-                  )}
-                >
-                  Admin
-                </Link>
-              )}
+          <SignedIn>
+            {isAdminUser && (
               <Link
-                href="/submissions"
+                href="/admin/dashboard"
                 className={cn(
                   'rounded-md px-2.5 py-1.5 text-sm font-medium text-white/90 hover:bg-white/5 hover:text-white',
-                  pathname.startsWith('/submissions') && 'bg-white/10 text-green-400',
+                  pathname.startsWith('/admin') && 'bg-white/10 text-green-400',
                 )}
               >
-                Submissions
+                Admin
               </Link>
-              <div
-                className="hidden items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-amber-400 sm:flex"
-                title="Streak"
-              >
-                <span className="text-base" aria-hidden>
-                  🔥
-                </span>
-                <span className="text-xs font-semibold">{streak} Day Streak</span>
-              </div>
+            )}
+            <Link
+              href="/submissions"
+              className={cn(
+                'rounded-md px-2.5 py-1.5 text-sm font-medium text-white/90 hover:bg-white/5 hover:text-white',
+                pathname.startsWith('/submissions') && 'bg-white/10 text-green-400',
+              )}
+            >
+              Submissions
+            </Link>
+            <div
+              className="hidden items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-amber-400 sm:flex"
+              title="Streak"
+            >
+              <span className="text-base" aria-hidden>
+                🔥
+              </span>
+              <span className="text-xs font-semibold">{streak} Day Streak</span>
+            </div>
+            {user && (
               <Link
                 href={`/${user.username}`}
                 className="flex items-center gap-2 rounded-full bg-white/10 py-1 pl-1 pr-3 text-sm text-white transition-colors hover:bg-white/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500"
@@ -160,25 +156,32 @@ export function AppNavbar({ className, activeHref, activePage }: AppNavbarProps)
                 </span>
                 <span className="hidden max-w-[120px] truncate sm:inline">{user.username}</span>
               </Link>
+            )}
+            <UserButton afterSignOutUrl="/" />
+            <button
+              type="button"
+              onClick={() => void handleLogout()}
+              className="rounded-md border border-white/20 bg-transparent px-3 py-1.5 text-sm font-medium text-white/90 transition-colors hover:bg-white/10"
+            >
+              Logout
+            </button>
+          </SignedIn>
+          <SignedOut>
+            <SignInButton mode="modal">
               <button
                 type="button"
-                onClick={handleLogout}
-                className="rounded-md border border-white/20 bg-transparent px-3 py-1.5 text-sm font-medium text-white/90 transition-colors hover:bg-white/10"
+                className="rounded-md bg-emerald-500 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-600"
               >
-                Logout
+                Login
               </button>
-            </>
-          ) : (
+            </SignInButton>
             <Link
-              href="/login"
-              className={cn(
-                'rounded-md px-2.5 py-1.5 text-sm font-medium text-white/90 transition-colors hover:bg-white/5 hover:text-white',
-                pathname.startsWith('/login') && 'bg-white/10 text-green-400',
-              )}
+              href="/sign-up"
+              className="rounded-md px-2.5 py-1.5 text-sm font-medium text-white/90 hover:bg-white/5"
             >
-              Login
+              Sign up
             </Link>
-          )}
+          </SignedOut>
         </div>
       </div>
     </nav>

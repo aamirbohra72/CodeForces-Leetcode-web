@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { DashboardShell } from '@/components/DashboardShell';
 import { api } from '@/lib/api';
 import { getToken } from '@/lib/auth';
+import { startRazorpayCheckout } from '@/lib/razorpayCheckout';
 
 interface Course {
   id: string;
@@ -100,7 +101,40 @@ export default function LearnPage() {
   const [generatedCourses, setGeneratedCourses] = useState<GeneratedCourseSummary[]>([]);
   const [generatedLoading, setGeneratedLoading] = useState(false);
   const [generatedError, setGeneratedError] = useState('');
+  const [enrolledIds, setEnrolledIds] = useState<Set<string>>(new Set());
+  const [payingId, setPayingId] = useState<string | null>(null);
+  const [payError, setPayError] = useState('');
 
+  useEffect(() => {
+    if (!getToken()) return;
+    void api
+      .get<{ enrollments: Array<{ productId: string }> }>('/payments/enrollments')
+      .then((data) => setEnrolledIds(new Set(data.enrollments.map((e) => e.productId))))
+      .catch(() => undefined);
+  }, []);
+
+  const handlePremiumEnroll = async (courseId: string) => {
+    if (!getToken()) {
+      window.location.href = `/sign-in?redirect_url=/learn`;
+      return;
+    }
+    if (enrolledIds.has(courseId)) {
+      window.location.href = `/learn/${courseId}`;
+      return;
+    }
+    setPayingId(courseId);
+    setPayError('');
+    try {
+      await startRazorpayCheckout(courseId);
+      setEnrolledIds((prev) => new Set(prev).add(courseId));
+      window.location.href = `/learn/${courseId}`;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Payment failed';
+      if (msg !== 'Payment cancelled') setPayError(msg);
+    } finally {
+      setPayingId(null);
+    }
+  };
   useEffect(() => {
     if (activeFilter !== 'bundles') return;
 
@@ -368,6 +402,9 @@ export default function LearnPage() {
 
       {activeFilter !== 'bundles' && (
         <>
+          {payError && (
+            <p style={{ color: '#f87171', marginBottom: '1rem' }}>{payError}</p>
+          )}
           <div
             style={{
               display: 'grid',
@@ -553,10 +590,20 @@ export default function LearnPage() {
                       }}
                       onClick={(e) => {
                         e.preventDefault();
-                        window.location.href = `/learn/${course.id}`;
+                        if (course.isPremium) {
+                          void handlePremiumEnroll(course.id);
+                        } else {
+                          window.location.href = `/learn/${course.id}`;
+                        }
                       }}
                     >
-                      {course.isPremium ? 'Enroll Now' : 'Start Learning'}
+                      {course.isPremium
+                        ? enrolledIds.has(course.id)
+                          ? 'Open Course'
+                          : payingId === course.id
+                            ? 'Opening checkout…'
+                            : 'Buy & Enroll'
+                        : 'Start Learning'}
                     </button>
                   </div>
                 </div>

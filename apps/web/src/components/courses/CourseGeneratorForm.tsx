@@ -63,10 +63,25 @@ export function CourseGeneratorForm() {
     setError('');
 
     if (!getToken()) {
-      const msg = 'Please log in to generate a course';
+      const msg = 'Please sign in to generate a course';
       setError(msg);
       setToast(msg);
+      router.push('/sign-in?redirect_url=/learn/create');
       return;
+    }
+
+    try {
+      const { enrolled } = await api.get<{ enrolled: boolean }>(
+        '/payments/enrollments/ai-generate',
+      );
+      if (!enrolled) {
+        setError('AI Course Credit required. Redirecting to Billing…');
+        setToast('Buy AI Course Credit on Billing to generate courses');
+        router.push('/billing');
+        return;
+      }
+    } catch {
+      // continue — server will enforce if check fails
     }
 
     let content = sourceContent.trim();

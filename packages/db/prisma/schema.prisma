@@ -56,22 +56,26 @@ enum InterviewVerdict {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  username  String   @unique
-  role      UserRole @default(USER)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  email       String   @unique
+  username    String   @unique
+  role        UserRole @default(USER)
+  clerkUserId String?  @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  submissions        Submission[]
-  leaderboardEntries LeaderboardEntry[]
-  interviewSessions  InterviewSession[]
+  submissions          Submission[]
+  leaderboardEntries   LeaderboardEntry[]
+  interviewSessions    InterviewSession[]
   contestRegistrations ContestRegistration[]
-  courses            Course[]
-  topicProgress      Progress[]
+  courses              Course[]
+  topicProgress        Progress[]
+  paymentOrders        PaymentOrder[]
+  enrollments          Enrollment[]
 
   @@index([email])
   @@index([username])
+  @@index([clerkUserId])
 }
 
 model OTP {
@@ -335,4 +339,45 @@ model Progress {
 
   @@unique([userId, topicId])
   @@index([userId])
+}
+
+enum PaymentStatus {
+  CREATED
+  PAID
+  FAILED
+}
+
+model PaymentOrder {
+  id                String        @id @default(cuid())
+  userId            String
+  productId         String
+  productTitle      String
+  amountPaise       Int
+  currency          String        @default("INR")
+  status            PaymentStatus @default(CREATED)
+  razorpayOrderId   String        @unique
+  razorpayPaymentId String?
+  razorpaySignature String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([productId])
+  @@index([status])
+}
+
+model Enrollment {
+  id        String   @id @default(cuid())
+  userId    String
+  productId String
+  orderId   String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@index([userId])
+  @@index([productId])
 }

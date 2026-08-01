@@ -1,30 +1,68 @@
-import { createClient } from 'redis';
+import { createClient, type RedisClientType } from 'redis';
 
-const redisClient = createClient({
-  url: process.env.REDIS_URL || 'redis://localhost:6379',
-});
+/** Prefer IPv4 — on Windows `localhost` often resolves to ::1 and fails if Redis only binds 127.0.0.1 */
+const REDIS_URL = process.env.REDIS_URL?.trim() || 'redis://127.0.0.1:6379';
 
-redisClient.on('error', (err) => console.error('Redis Client Error', err));
-
+let redisClient: RedisClientType | null = null;
 let isConnected = false;
+let connectAttempted = false;
+let errorLogged = false;
+
+function getClient(): RedisClientType {
+  if (!redisClient) {
+    redisClient = createClient({
+      url: REDIS_URL,
+      socket: {
+        reconnectStrategy: (retries) => {
+          // Stop hammering when Redis is down (dev without Redis is fine)
+          if (retries > 3) {
+            return false;
+          }
+          return Math.min(retries * 200, 1000);
+        },
+        connectTimeout: 3000,
+      },
+    });
+
+    redisClient.on('error', (err) => {
+      // Log once — avoid flooding the terminal
+      if (!errorLogged) {
+        errorLogged = true;
+        console.warn(
+          `⚠️  Redis unavailable (${REDIS_URL}): ${err instanceof Error ? err.message : String(err)}`,
+        );
+        console.warn('⚠️  Continuing without Redis (cache/leaderboard limited)');
+      }
+    });
+  }
+  return redisClient;
+}
 
 export async function connectRedis(): Promise<void> {
-  if (isConnected) return;
+  if (isConnected || connectAttempted) return;
+  connectAttempted = true;
+
   try {
-    await redisClient.connect();
+    const client = getClient();
+    await client.connect();
     isConnected = true;
-    console.log('✅ Redis connected');
+    errorLogged = false;
+    console.log(`✅ Redis connected (${REDIS_URL})`);
   } catch (error) {
-    console.error('Failed to connect to Redis:', error);
-    // In development, continue without Redis
-    if (process.env.NODE_ENV === 'development') {
-      console.warn('⚠️  Continuing without Redis (leaderboard features will be limited)');
+    isConnected = false;
+    if (!errorLogged) {
+      errorLogged = true;
+      console.warn(
+        `⚠️  Failed to connect to Redis (${REDIS_URL}):`,
+        error instanceof Error ? error.message : error,
+      );
+      console.warn('⚠️  Continuing without Redis (cache/leaderboard limited)');
     }
   }
 }
 
 export async function disconnectRedis(): Promise<void> {
-  if (!isConnected) return;
+  if (!redisClient || !isConnected) return;
   try {
     await redisClient.quit();
     isConnected = false;
@@ -36,9 +74,9 @@ export async function disconnectRedis(): Promise<void> {
 export async function addToLeaderboard(
   contestId: string,
   userId: string,
-  score: number
+  score: number,
 ): Promise<void> {
-  if (!isConnected) return;
+  if (!isConnected || !redisClient) return;
   try {
     const key = `leaderboard:${contestId}`;
     await redisClient.zAdd(key, {
@@ -52,13 +90,13 @@ export async function addToLeaderboard(
 
 export async function getLeaderboard(
   contestId: string,
-  limit: number = 100
+  limit: number = 100,
 ): Promise<Array<{ userId: string; score: number; rank: number }>> {
-  if (!isConnected) return [];
+  if (!isConnected || !redisClient) return [];
   try {
     const key = `leaderboard:${contestId}`;
     const results = await redisClient.zRangeWithScores(key, 0, limit - 1, {
-      REV: true, // Descending order (highest score first)
+      REV: true,
     });
 
     return results.map((result, index) => ({
@@ -73,7 +111,7 @@ export async function getLeaderboard(
 }
 
 export async function getUserRank(contestId: string, userId: string): Promise<number | null> {
-  if (!isConnected) return null;
+  if (!isConnected || !redisClient) return null;
   try {
     const key = `leaderboard:${contestId}`;
     const rank = await redisClient.zRevRank(key, userId);
@@ -85,7 +123,7 @@ export async function getUserRank(contestId: string, userId: string): Promise<nu
 }
 
 export async function clearLeaderboard(contestId: string): Promise<void> {
-  if (!isConnected) return;
+  if (!isConnected || !redisClient) return;
   try {
     const key = `leaderboard:${contestId}`;
     await redisClient.del(key);
@@ -95,7 +133,7 @@ export async function clearLeaderboard(contestId: string): Promise<void> {
 }
 
 export async function cacheGet(key: string): Promise<string | null> {
-  if (!isConnected) return null;
+  if (!isConnected || !redisClient) return null;
   try {
     return await redisClient.get(key);
   } catch (error) {
@@ -105,7 +143,7 @@ export async function cacheGet(key: string): Promise<string | null> {
 }
 
 export async function cacheSet(key: string, value: string, ttlSeconds: number): Promise<void> {
-  if (!isConnected) return;
+  if (!isConnected || !redisClient) return;
   try {
     await redisClient.set(key, value, { EX: ttlSeconds });
   } catch (error) {
@@ -114,7 +152,7 @@ export async function cacheSet(key: string, value: string, ttlSeconds: number): 
 }
 
 export async function cacheDel(key: string): Promise<void> {
-  if (!isConnected) return;
+  if (!isConnected || !redisClient) return;
   try {
     await redisClient.del(key);
   } catch (error) {
@@ -123,5 +161,3 @@ export async function cacheDel(key: string): Promise<void> {
 }
 
 export { redisClient };
-
-
