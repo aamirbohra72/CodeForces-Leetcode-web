@@ -6,22 +6,36 @@ import { setToken, setUser, removeToken, removeUser } from '@/lib/auth';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001/api';
 
+export function clearLocalAuth() {
+  removeToken();
+  removeUser();
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('auth-changed'));
+  }
+}
+
 /**
- * After Clerk sign-in, exchange the Clerk session for our API JWT
- * so existing Express routes (Bearer token) keep working.
+ * Clerk is the only UI auth. After sign-in we exchange for our API JWT
+ * so Express routes (leaderboard, courses, payments, etc.) keep working.
  */
 export function ClerkApiBridge() {
   const { isSignedIn, isLoaded, getToken } = useAuth();
   const exchanging = useRef(false);
+  const lastSignedIn = useRef<boolean | null>(null);
 
   useEffect(() => {
     if (!isLoaded) return;
 
+    // Signed out → drop legacy JWT/user from localStorage
     if (!isSignedIn) {
-      // Keep OTP sessions intact if present; only clear when Clerk explicitly signs out
+      if (lastSignedIn.current === true) {
+        clearLocalAuth();
+      }
+      lastSignedIn.current = false;
       return;
     }
 
+    lastSignedIn.current = true;
     if (exchanging.current) return;
     exchanging.current = true;
 
@@ -60,10 +74,4 @@ export function ClerkApiBridge() {
   }, [isLoaded, isSignedIn, getToken]);
 
   return null;
-}
-
-export function clearLocalAuth() {
-  removeToken();
-  removeUser();
-  window.dispatchEvent(new Event('auth-changed'));
 }

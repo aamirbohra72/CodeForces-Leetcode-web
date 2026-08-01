@@ -42,7 +42,7 @@ export default function ChallengePage() {
     setError('');
 
     if (!isAuthenticated()) {
-      router.push('/login');
+      router.push('/sign-in');
       return;
     }
 

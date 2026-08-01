@@ -459,7 +459,7 @@ export default function InterviewPage() {
       {hasMounted && phase === 'intro' && !getToken() && (
         <div className="mb-4 rounded-lg border border-amber-900/40 bg-amber-950/20 px-3 py-2 text-sm text-amber-100">
           You must be logged in.{' '}
-          <Link href="/login?from=%2Finterview" className="font-medium text-[#22c55e] underline">
+          <Link href="/sign-in?redirect_url=%2Finterview" className="font-medium text-[#22c55e] underline">
             Go to login
           </Link>
         </div>
@@ -630,7 +630,7 @@ export default function InterviewPage() {
           {needRelogin && (
             <div className="mt-3 space-y-2 text-[#e5e5e5]">
               <Link
-                href="/login?from=%2Finterview"
+                href="/sign-in?redirect_url=%2Finterview"
                 className="inline-block rounded-lg bg-[#22c55e] px-3 py-1.5 text-sm font-medium text-black hover:bg-[#1ea34a]"
               >
                 Log in again

@@ -61,7 +61,7 @@ export default function SubmissionsClient() {
 
   useEffect(() => {
     if (!isAuthenticated()) {
-      router.push('/login');
+      router.push('/sign-in');
       return;
     }
     void fetchSubmissions();

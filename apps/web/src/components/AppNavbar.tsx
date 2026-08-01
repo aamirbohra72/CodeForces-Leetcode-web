@@ -3,9 +3,8 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import { SignedIn, SignedOut, SignInButton, UserButton, useClerk } from '@clerk/nextjs';
+import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from '@clerk/nextjs';
 import { getUser, isAdmin } from '@/lib/auth';
-import { clearLocalAuth } from '@/components/ClerkApiBridge';
 import { cn } from '@/lib/cn';
 import { SidebarTrigger } from '@/components/SidebarTrigger';
 
@@ -48,34 +47,24 @@ function linkIsActive(pathname: string, href: string, override?: string) {
 export function AppNavbar({ className, activeHref, activePage }: AppNavbarProps) {
   const pathname = usePathname() ?? '';
   const resolvedActive = activeHref ?? activePage;
-  const { signOut } = useClerk();
-  const [user, setUser] = useState<ReturnType<typeof getUser>>(null);
+  const [username, setUsername] = useState<string | null>(null);
   const [isAdminUser, setIsAdminUser] = useState(false);
   const [streak, setStreak] = useState(0);
 
-  const refreshUser = useCallback(() => {
-    setUser(getUser());
+  const refreshLocalProfile = useCallback(() => {
+    const u = getUser();
+    setUsername(u?.username ?? null);
     setIsAdminUser(isAdmin());
     const raw = typeof window !== 'undefined' ? localStorage.getItem('streak') : null;
     setStreak(parseInt(raw ?? '0', 10) || 0);
   }, []);
 
   useEffect(() => {
-    refreshUser();
-    const onAuth = () => refreshUser();
+    refreshLocalProfile();
+    const onAuth = () => refreshLocalProfile();
     window.addEventListener('auth-changed', onAuth);
-    window.addEventListener('storage', onAuth);
-    return () => {
-      window.removeEventListener('auth-changed', onAuth);
-      window.removeEventListener('storage', onAuth);
-    };
-  }, [refreshUser]);
-
-  const handleLogout = async () => {
-    clearLocalAuth();
-    await signOut({ redirectUrl: '/' });
-    refreshUser();
-  };
+    return () => window.removeEventListener('auth-changed', onAuth);
+  }, [refreshLocalProfile]);
 
   return (
     <nav
@@ -115,7 +104,7 @@ export function AppNavbar({ className, activeHref, activePage }: AppNavbarProps)
           </div>
         </div>
 
-        <div className="relative z-10 ml-auto flex shrink-0 items-center gap-x-1 bg-nav-bg sm:gap-x-3">
+        <div className="relative z-10 ml-auto flex shrink-0 items-center gap-x-2 bg-nav-bg sm:gap-x-3">
           <SignedIn>
             {isAdminUser && (
               <Link
@@ -131,7 +120,7 @@ export function AppNavbar({ className, activeHref, activePage }: AppNavbarProps)
             <Link
               href="/submissions"
               className={cn(
-                'rounded-md px-2.5 py-1.5 text-sm font-medium text-white/90 hover:bg-white/5 hover:text-white',
+                'hidden rounded-md px-2.5 py-1.5 text-sm font-medium text-white/90 hover:bg-white/5 hover:text-white sm:inline-block',
                 pathname.startsWith('/submissions') && 'bg-white/10 text-green-400',
               )}
             >
@@ -146,26 +135,24 @@ export function AppNavbar({ className, activeHref, activePage }: AppNavbarProps)
               </span>
               <span className="text-xs font-semibold">{streak} Day Streak</span>
             </div>
-            {user && (
-              <Link
-                href={`/${user.username}`}
-                className="flex items-center gap-2 rounded-full bg-white/10 py-1 pl-1 pr-3 text-sm text-white transition-colors hover:bg-white/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500"
-              >
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-green-600 text-xs font-bold text-white">
-                  {user.username.charAt(0).toUpperCase()}
-                </span>
-                <span className="hidden max-w-[120px] truncate sm:inline">{user.username}</span>
-              </Link>
-            )}
-            <UserButton afterSignOutUrl="/" />
-            <button
-              type="button"
-              onClick={() => void handleLogout()}
-              className="rounded-md border border-white/20 bg-transparent px-3 py-1.5 text-sm font-medium text-white/90 transition-colors hover:bg-white/10"
+            <UserButton
+              afterSignOutUrl="/"
+              appearance={{
+                elements: {
+                  avatarBox: 'h-8 w-8',
+                },
+              }}
             >
-              Logout
-            </button>
+              <UserButton.MenuItems>
+                {username ? (
+                  <UserButton.Link label="My profile" href={`/${username}`} labelIcon={<span>👤</span>} />
+                ) : null}
+                <UserButton.Link label="Submissions" href="/submissions" labelIcon={<span>📝</span>} />
+                <UserButton.Link label="Billing" href="/billing" labelIcon={<span>💳</span>} />
+              </UserButton.MenuItems>
+            </UserButton>
           </SignedIn>
+
           <SignedOut>
             <SignInButton mode="modal">
               <button
@@ -175,12 +162,14 @@ export function AppNavbar({ className, activeHref, activePage }: AppNavbarProps)
                 Login
               </button>
             </SignInButton>
-            <Link
-              href="/sign-up"
-              className="rounded-md px-2.5 py-1.5 text-sm font-medium text-white/90 hover:bg-white/5"
-            >
-              Sign up
-            </Link>
+            <SignUpButton mode="modal">
+              <button
+                type="button"
+                className="rounded-md border border-white/20 px-3 py-1.5 text-sm font-medium text-white/90 hover:bg-white/5"
+              >
+                Sign up
+              </button>
+            </SignUpButton>
           </SignedOut>
         </div>
       </div>

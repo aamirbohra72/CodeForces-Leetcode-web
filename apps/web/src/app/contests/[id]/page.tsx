@@ -79,7 +79,7 @@ export default function ContestDetailPage() {
 
   const handleRegister = async () => {
     if (!isAuthenticated()) {
-      router.push(`/login?from=/contests/${contestId}`);
+      router.push(`/sign-in?redirect_url=/contests/${contestId}`);
       return;
     }
     setRegBusy(true);

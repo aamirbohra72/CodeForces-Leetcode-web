@@ -55,7 +55,7 @@ export function isAdmin(): boolean {
 export function logout(): void {
   removeToken();
   removeUser();
-  window.location.href = '/login';
+  window.location.href = '/sign-in';
 }
 
 

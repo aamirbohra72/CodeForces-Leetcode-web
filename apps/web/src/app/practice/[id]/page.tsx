@@ -84,7 +84,7 @@ export default function PracticeProblemPage() {
       return;
     }
     if (!isAuthenticated()) {
-      router.push('/login');
+      router.push('/sign-in');
       return;
     }
     if (!challenge?.judgeReady) {
@@ -138,7 +138,7 @@ export default function PracticeProblemPage() {
     setHintText(null);
 
     if (!isAuthenticated()) {
-      router.push('/login');
+      router.push('/sign-in');
       return;
     }
     if (!sourceCode.trim()) {

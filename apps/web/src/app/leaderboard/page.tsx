@@ -115,7 +115,7 @@ export default function LeaderboardPage() {
                   <p className="mt-1 text-sm text-white/45">Outside top 100 — keep solving!</p>
                 ) : (
                   <p className="mt-1 text-sm text-white/45">
-                    <Link href="/login" className="text-green-400 hover:underline">
+                    <Link href="/sign-in" className="text-green-400 hover:underline">
                       Sign in
                     </Link>{' '}
                     for your stats

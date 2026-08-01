@@ -115,7 +115,7 @@ export function HomeLanding() {
               Start practicing
             </Link>
             <Link
-              href="/login"
+              href="/sign-in"
               className="inline-flex rounded-lg px-6 py-3 text-sm font-semibold text-[#b0b0b0] transition hover:text-white"
             >
               Login
