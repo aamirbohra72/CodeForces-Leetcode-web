@@ -1,7 +1,12 @@
 import Razorpay from 'razorpay';
 import crypto from 'node:crypto';
 import { prisma } from '@codeforces/db';
-import { getProduct } from './productCatalog';
+import {
+  enrollmentIdsForProduct,
+  getProduct,
+  userHasEnrollment,
+  userOwnsAllGrants,
+} from './productCatalog';
 
 function getRazorpay() {
   const key_id = process.env.RAZORPAY_KEY_ID?.trim();
@@ -18,11 +23,14 @@ export async function createPaymentOrder(userId: string, productId: string) {
     throw new Error('PRODUCT_NOT_FOUND');
   }
 
-  const existing = await prisma.enrollment.findUnique({
-    where: { userId_productId: { userId, productId } },
-  });
-  if (existing) {
+  if (await userHasEnrollment(userId, productId)) {
     throw new Error('ALREADY_ENROLLED');
+  }
+
+  if (product.kind === 'bundle' && product.grantsProductIds?.length) {
+    if (await userOwnsAllGrants(userId, product.grantsProductIds)) {
+      throw new Error('ALREADY_ENROLLED');
+    }
   }
 
   const razorpay = getRazorpay();
@@ -34,6 +42,7 @@ export async function createPaymentOrder(userId: string, productId: string) {
     notes: {
       productId: product.productId,
       userId,
+      kind: product.kind,
     },
   });
 
@@ -58,6 +67,7 @@ export async function createPaymentOrder(userId: string, productId: string) {
     productTitle: product.title,
     keyId: process.env.RAZORPAY_KEY_ID!,
     paymentDbId: payment.id,
+    grantsProductIds: product.grantsProductIds ?? [],
   };
 }
 
@@ -85,8 +95,18 @@ export async function verifyPayment(input: {
     throw new Error('ORDER_NOT_FOUND');
   }
 
+  const product = getProduct(payment.productId);
+  const enrollIds = product
+    ? enrollmentIdsForProduct(product)
+    : [payment.productId];
+
   if (payment.status === 'PAID') {
-    return { ok: true, alreadyPaid: true, productId: payment.productId };
+    return {
+      ok: true,
+      alreadyPaid: true,
+      productId: payment.productId,
+      productIds: enrollIds,
+    };
   }
 
   await prisma.$transaction([
@@ -98,18 +118,25 @@ export async function verifyPayment(input: {
         razorpaySignature: input.razorpaySignature,
       },
     }),
-    prisma.enrollment.upsert({
-      where: {
-        userId_productId: { userId: input.userId, productId: payment.productId },
-      },
-      create: {
-        userId: input.userId,
-        productId: payment.productId,
-        orderId: payment.id,
-      },
-      update: {},
-    }),
+    ...enrollIds.map((id) =>
+      prisma.enrollment.upsert({
+        where: {
+          userId_productId: { userId: input.userId, productId: id },
+        },
+        create: {
+          userId: input.userId,
+          productId: id,
+          orderId: payment.id,
+        },
+        update: {},
+      }),
+    ),
   ]);
 
-  return { ok: true, alreadyPaid: false, productId: payment.productId };
+  return {
+    ok: true,
+    alreadyPaid: false,
+    productId: payment.productId,
+    productIds: enrollIds,
+  };
 }

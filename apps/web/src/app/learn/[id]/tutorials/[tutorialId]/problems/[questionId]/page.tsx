@@ -6,10 +6,11 @@ import { useParams, useRouter } from 'next/navigation';
 import { DashboardShell } from '@/components/DashboardShell';
 import { api } from '@/lib/api';
 import {
-  getHldQuestion,
   getTutorial,
-  saveQuestionProgress,
-} from '@/data/tutorials/system-design';
+  getQuestionsForTutorial,
+  catalogLearningById,
+} from '@/data/tutorials/catalog-index';
+import { saveQuestionProgress } from '@/data/tutorials/system-design';
 import {
   getTutorialLearning,
   syncCoinsFromProgress,
@@ -93,8 +94,9 @@ export default function TutorialProblemPage() {
           });
         } else {
           const t = getTutorial(courseId, tutorialId);
-          const q = getHldQuestion(questionId);
-          const l = getTutorialLearning(tutorialId);
+          const questions = t ? getQuestionsForTutorial(courseId, t.questionIds) : [];
+          const q = questions.find((x) => x.id === questionId);
+          const l = getTutorialLearning(tutorialId) || catalogLearningById[tutorialId];
           if (!t || !q || !t.questionIds.includes(questionId) || !l) {
             throw new Error('Problem not found for this tutorial');
           }

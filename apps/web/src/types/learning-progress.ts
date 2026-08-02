@@ -61,11 +61,12 @@ export type CompleteItemPayload = {
 
 /** Default totals for known catalog courses (modules / tutorials). */
 export const CATALOG_TOTALS: Record<string, number> = {
-  '1': 5, // DSA modules
-  '2': 3, // Node modules
-  '3': 6, // React (LLM / fallback)
+  '1': 6, // DSA tutorials
+  '2': 6, // Node.js tutorials
+  '3': 6, // React tutorials
+  '4': 4, // JS fundamentals
   '5': 3, // System Design tutorials
-  '4': 4, // JS fundamentals free
+  '6': 4, // Python beginners
 };
 
 export function syncStreakToLocal(streak: LearningStreak) {

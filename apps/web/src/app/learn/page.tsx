@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { DashboardShell } from '@/components/DashboardShell';
 import { api } from '@/lib/api';
 import { getToken } from '@/lib/auth';
-import { markLocalEnrollment, markLocalEnrollments } from '@/lib/enrollment';
+import { markLocalEnrollments } from '@/lib/enrollment';
 import { startRazorpayCheckout } from '@/lib/razorpayCheckout';
 import { fetchLearningSummary } from '@/lib/learningProgress';
 import type { CourseLearningProgress } from '@/types/learning-progress';
@@ -33,12 +33,33 @@ interface GeneratedCourseSummary {
   estimatedMinutes: number;
 }
 
+type CatalogProduct = {
+  productId: string;
+  title: string;
+  description: string;
+  amountPaise: number;
+  currency: string;
+  kind: 'course' | 'credit' | 'bundle';
+  grantsProductIds?: string[];
+};
+
+const COURSE_LABELS: Record<string, string> = {
+  '1': 'Salaam DSA',
+  '2': 'Salaam Node.js',
+  '3': 'Salaam React',
+  '5': 'System Design',
+};
+
+function formatInr(paise: number) {
+  return `₹${(paise / 100).toFixed(0)}`;
+}
+
 const mockCourses: Course[] = [
   {
     id: '1',
     title: 'Salaam DSA',
     description:
-      'Master Data Structures and Algorithms with hands-on coding, clear explanations, and real-world problem-solving.',
+      '6 modules · arrays to DP — notes, flashcards, and quizzes for interview patterns.',
     rating: 4.9,
     reviews: 1000,
     language: 'English',
@@ -48,7 +69,8 @@ const mockCourses: Course[] = [
   {
     id: '2',
     title: 'Salaam Node.js',
-    description: 'From basics to advanced concepts, gain experience in building applications with Node.js.',
+    description:
+      '6 modules · Express, Prisma, auth, caching, and production Node patterns.',
     rating: 4.8,
     reviews: 2000,
     language: 'English',
@@ -58,7 +80,8 @@ const mockCourses: Course[] = [
   {
     id: '3',
     title: 'Salaam React',
-    description: 'Learn React from scratch and build modern web applications with hooks, context, and more.',
+    description:
+      '6 modules · hooks, routing, performance, and Next.js mental models with practice.',
     rating: 4.9,
     reviews: 1500,
     language: 'English',
@@ -68,7 +91,7 @@ const mockCourses: Course[] = [
   {
     id: '4',
     title: 'JavaScript Fundamentals',
-    description: 'Master the fundamentals of JavaScript programming language.',
+    description: 'Free · 4 modules covering language basics, async JS, and browser patterns.',
     rating: 4.7,
     reviews: 800,
     language: 'English',
@@ -78,7 +101,7 @@ const mockCourses: Course[] = [
   {
     id: '5',
     title: 'System Design',
-    description: 'Learn to design scalable systems and ace your system design interviews.',
+    description: '3 deep HLD sessions · capacity, storage, caching, queues, and reliability.',
     rating: 4.8,
     reviews: 1200,
     language: 'English',
@@ -88,7 +111,7 @@ const mockCourses: Course[] = [
   {
     id: '6',
     title: 'Python for Beginners',
-    description: 'Start your programming journey with Python. Learn syntax, data structures, and more.',
+    description: 'Free · 4 modules from core data types to asyncio and simple APIs.',
     rating: 4.6,
     reviews: 600,
     language: 'English',
@@ -97,13 +120,15 @@ const mockCourses: Course[] = [
   },
 ];
 
-type FilterType = 'all' | 'paid' | 'free' | 'bundles' | 'partners';
+type FilterType = 'all' | 'paid' | 'free' | 'career' | 'mine';
 
 export default function LearnPage() {
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const [generatedCourses, setGeneratedCourses] = useState<GeneratedCourseSummary[]>([]);
   const [generatedLoading, setGeneratedLoading] = useState(false);
   const [generatedError, setGeneratedError] = useState('');
+  const [bundles, setBundles] = useState<CatalogProduct[]>([]);
+  const [bundlesLoading, setBundlesLoading] = useState(false);
   const [enrolledIds, setEnrolledIds] = useState<Set<string>>(new Set());
   const [payingId, setPayingId] = useState<string | null>(null);
   const [payError, setPayError] = useState('');
@@ -157,9 +182,12 @@ export default function LearnPage() {
     setPayingId(courseId);
     setPayError('');
     try {
-      await startRazorpayCheckout(courseId);
-      markLocalEnrollment(courseId);
-      setEnrolledIds((prev) => new Set(prev).add(courseId));
+      const result = await startRazorpayCheckout(courseId);
+      setEnrolledIds((prev) => {
+        const next = new Set(prev);
+        for (const id of result.productIds) next.add(id);
+        return next;
+      });
       window.location.href = `/learn/${courseId}`;
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Payment failed';
@@ -168,8 +196,40 @@ export default function LearnPage() {
       setPayingId(null);
     }
   };
+
+  const handleBundleBuy = async (bundle: CatalogProduct) => {
+    if (!getToken()) {
+      window.location.href = `/sign-in?redirect_url=/learn`;
+      return;
+    }
+    const grants = bundle.grantsProductIds ?? [];
+    const owned =
+      enrolledIds.has(bundle.productId) ||
+      (grants.length > 0 && grants.every((id) => enrolledIds.has(id)));
+    if (owned) {
+      window.location.href = `/learn/${grants[0] ?? '1'}`;
+      return;
+    }
+    setPayingId(bundle.productId);
+    setPayError('');
+    try {
+      const result = await startRazorpayCheckout(bundle.productId);
+      setEnrolledIds((prev) => {
+        const next = new Set(prev);
+        for (const id of result.productIds) next.add(id);
+        return next;
+      });
+      window.location.href = `/learn/${grants[0] ?? '1'}`;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Payment failed';
+      if (msg !== 'Payment cancelled') setPayError(msg);
+    } finally {
+      setPayingId(null);
+    }
+  };
+
   useEffect(() => {
-    if (activeFilter !== 'bundles') return;
+    if (activeFilter !== 'mine') return;
 
     let cancelled = false;
     (async () => {
@@ -199,6 +259,27 @@ export default function LearnPage() {
     };
   }, [activeFilter]);
 
+  useEffect(() => {
+    if (activeFilter !== 'career') return;
+    let cancelled = false;
+    (async () => {
+      setBundlesLoading(true);
+      try {
+        const data = await api.get<{ products: CatalogProduct[] }>('/payments/products');
+        if (!cancelled) {
+          setBundles(data.products.filter((p) => p.kind === 'bundle'));
+        }
+      } catch {
+        if (!cancelled) setBundles([]);
+      } finally {
+        if (!cancelled) setBundlesLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeFilter]);
+
   const filteredCourses =
     activeFilter === 'all'
       ? mockCourses
@@ -206,17 +287,14 @@ export default function LearnPage() {
         ? mockCourses.filter((c) => c.isPremium)
         : activeFilter === 'free'
           ? mockCourses.filter((c) => !c.isPremium)
-          : activeFilter === 'bundles'
-            ? []
-            : mockCourses;
+          : [];
 
   const filters: { label: string; value: FilterType; key: string }[] = [
     { label: 'All Courses', value: 'all', key: 'all' },
     { label: 'Paid Courses', value: 'paid', key: 'paid' },
-    { label: 'Create Own Course Bundle', value: 'bundles', key: 'create-own' },
-    { label: 'Course Bundles', value: 'partners', key: 'bundles-placeholder' },
     { label: 'Free Courses', value: 'free', key: 'free' },
-    { label: 'Our Partners', value: 'partners', key: 'partners' },
+    { label: 'Career Bundles', value: 'career', key: 'career' },
+    { label: 'My AI Courses', value: 'mine', key: 'mine' },
   ];
 
   return (
@@ -267,7 +345,7 @@ export default function LearnPage() {
         ))}
       </div>
 
-      {activeFilter === 'bundles' && (
+      {activeFilter === 'mine' && (
         <>
           <Link
             href="/learn/create"
@@ -433,7 +511,149 @@ export default function LearnPage() {
         </>
       )}
 
-      {activeFilter !== 'bundles' && (
+      {activeFilter === 'career' && (
+        <>
+          <div style={{ marginBottom: '1.5rem' }}>
+            <h2 style={{ fontSize: '1.25rem', marginBottom: '0.35rem', color: '#fff' }}>
+              Career Bundles
+            </h2>
+            <p style={{ color: '#b0b0b0', fontSize: '0.95rem' }}>
+              Multi-course paths at a lower price than buying each course alone. One payment unlocks
+              every included course.
+            </p>
+          </div>
+          {payError && <p style={{ color: '#f87171', marginBottom: '1rem' }}>{payError}</p>}
+          {bundlesLoading && <p style={{ color: '#b0b0b0', marginBottom: '1rem' }}>Loading bundles…</p>}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
+              gap: '1.5rem',
+            }}
+          >
+            {bundles.map((bundle) => {
+              const grants = bundle.grantsProductIds ?? [];
+              const owned =
+                enrolledIds.has(bundle.productId) ||
+                (grants.length > 0 && grants.every((id) => enrolledIds.has(id)));
+              return (
+                <div
+                  key={bundle.productId}
+                  style={{
+                    background: '#2a2a2a',
+                    borderRadius: '12px',
+                    overflow: 'hidden',
+                    border: '1px solid #3a3a3a',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    height: '100%',
+                  }}
+                >
+                  <div
+                    style={{
+                      height: '120px',
+                      background: 'linear-gradient(135deg, #0f766e, #22c55e)',
+                      position: 'relative',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <span
+                      style={{
+                        position: 'absolute',
+                        top: '1rem',
+                        right: '1rem',
+                        background: '#f59e0b',
+                        color: 'white',
+                        padding: '0.25rem 0.75rem',
+                        borderRadius: '20px',
+                        fontSize: '0.75rem',
+                        fontWeight: '700',
+                      }}
+                    >
+                      BUNDLE
+                    </span>
+                    <span style={{ fontSize: '2rem', fontWeight: 700, color: 'rgba(255,255,255,0.95)' }}>
+                      {grants.length} courses
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      padding: '1.5rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      flex: 1,
+                      gap: '0.75rem',
+                    }}
+                  >
+                    <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'white', margin: 0 }}>
+                      {bundle.title}
+                    </h3>
+                    <p style={{ color: '#b0b0b0', fontSize: '0.9rem', lineHeight: 1.6, margin: 0 }}>
+                      {bundle.description}
+                    </p>
+                    <ul
+                      style={{
+                        margin: 0,
+                        paddingLeft: '1.1rem',
+                        color: '#94a3b8',
+                        fontSize: '0.85rem',
+                        lineHeight: 1.7,
+                      }}
+                    >
+                      {grants.map((id) => (
+                        <li key={id}>{COURSE_LABELS[id] ?? `Course ${id}`}</li>
+                      ))}
+                    </ul>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'baseline',
+                        gap: '0.5rem',
+                        marginTop: 'auto',
+                      }}
+                    >
+                      <span style={{ fontSize: '1.5rem', fontWeight: 700, color: '#86efac' }}>
+                        {formatInr(bundle.amountPaise)}
+                      </span>
+                      <span style={{ fontSize: '0.8rem', color: '#6b7280' }}>one-time</span>
+                    </div>
+                    <button
+                      type="button"
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        background: owned ? '#16a34a' : '#22c55e',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        fontSize: '0.95rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
+                      onClick={() => void handleBundleBuy(bundle)}
+                    >
+                      {owned
+                        ? 'Open included courses'
+                        : payingId === bundle.productId
+                          ? 'Opening checkout…'
+                          : `Buy bundle · ${formatInr(bundle.amountPaise)}`}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {!bundlesLoading && bundles.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '3rem', color: '#b0b0b0' }}>
+              No career bundles available right now.
+            </div>
+          )}
+        </>
+      )}
+
+      {(activeFilter === 'all' || activeFilter === 'paid' || activeFilter === 'free') && (
         <>
           {payError && (
             <p style={{ color: '#f87171', marginBottom: '1rem' }}>{payError}</p>

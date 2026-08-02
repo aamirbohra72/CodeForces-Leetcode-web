@@ -104,11 +104,16 @@ export function CourseGeneratorForm() {
 
     setLoading(true);
     try {
-      const course = await api.post<GeneratedCourse>('/courses/generate', {
-        sourceType,
-        sourceContent: content,
-        goal: goal.trim() || undefined,
-      });
+      // Outline generation calls Mistral once (can take 30–120s). Content fills in background after redirect.
+      const course = await api.post<GeneratedCourse>(
+        '/courses/generate',
+        {
+          sourceType,
+          sourceContent: content,
+          goal: goal.trim() || undefined,
+        },
+        { timeoutMs: 180_000 },
+      );
       router.push(`/learn/notebook/${course.id}`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Course generation failed';

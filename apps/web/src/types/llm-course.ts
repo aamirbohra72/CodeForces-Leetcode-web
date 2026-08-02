@@ -40,8 +40,8 @@ export type LlmCoursePack = {
   tutorials: LlmTutorial[];
 };
 
-/** Courses that load curriculum live from Mistral (not static TS/JSON). */
-export const LLM_COURSE_IDS = new Set(['3']);
+/** Courses that optionally can load a live Mistral pack (static curriculum is primary). */
+export const LLM_COURSE_IDS = new Set<string>([]);
 
 export function isLlmDrivenCourse(courseId: string): boolean {
   return LLM_COURSE_IDS.has(courseId);

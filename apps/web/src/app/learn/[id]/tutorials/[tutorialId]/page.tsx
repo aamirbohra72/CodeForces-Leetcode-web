@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { DashboardShell } from '@/components/DashboardShell';
@@ -9,15 +9,17 @@ import { getToken } from '@/lib/auth';
 import { completeLearningItem } from '@/lib/learningProgress';
 import { CATALOG_TOTALS } from '@/types/learning-progress';
 import {
-  getHldQuestionsByIds,
+  getQuestionsForTutorial,
   getTutorial,
   getTutorialsForCourse,
+  catalogLearningById,
+} from '@/data/tutorials/catalog-index';
+import {
   loadProgress,
   type PracticeProgress,
 } from '@/data/tutorials/system-design';
 import {
   getTutorialLearning,
-  loadCoinState,
   saveCoinState,
   syncCoinsFromProgress,
   totalCoins,
@@ -124,7 +126,8 @@ export default function TutorialSessionPage() {
           if (!cancelled) setTutorial(fromLlmTutorial(found));
         } else {
           const staticTutorial = getTutorial(courseId, tutorialId);
-          const learning = getTutorialLearning(tutorialId);
+          const learning =
+            getTutorialLearning(tutorialId) || catalogLearningById[tutorialId];
           if (!staticTutorial || !learning) throw new Error('Tutorial not found');
           if (!cancelled) {
             setTutorial({
@@ -136,7 +139,7 @@ export default function TutorialSessionPage() {
               videoTitle: staticTutorial.videoTitle,
               videoMeta: staticTutorial.videoMeta,
               recordingUrl: staticTutorial.recordingUrl,
-              questions: getHldQuestionsByIds(staticTutorial.questionIds),
+              questions: getQuestionsForTutorial(courseId, staticTutorial.questionIds),
               learning,
               source: 'static',
             });

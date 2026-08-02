@@ -64,7 +64,7 @@ export async function mistralChatJson(system: string, user: string): Promise<str
   return mistralChat(system, user, { jsonMode: true });
 }
 
-const MISTRAL_FETCH_TIMEOUT_MS = 90_000;
+const MISTRAL_FETCH_TIMEOUT_MS = Number(process.env.MISTRAL_FETCH_TIMEOUT_MS || 120_000);
 
 async function fetchMistral(
   body: Record<string, unknown>,

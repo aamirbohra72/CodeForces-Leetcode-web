@@ -8,7 +8,7 @@ import { getToken } from '@/lib/auth';
 import {
   COURSE_PRODUCT_IDS,
   learnPathForProduct,
-  markLocalEnrollment,
+  markLocalEnrollments,
 } from '@/lib/enrollment';
 import { startRazorpayCheckout } from '@/lib/razorpayCheckout';
 import styles from './billing.module.css';
@@ -29,6 +29,8 @@ type Product = {
   description: string;
   amountPaise: number;
   currency: string;
+  kind?: 'course' | 'credit' | 'bundle';
+  grantsProductIds?: string[];
 };
 
 const PRODUCT_UI: Record<
@@ -60,7 +62,28 @@ const PRODUCT_UI: Record<
     accent: '#34d399',
     features: ['1 AI course generation', 'Custom notebook outline', 'Works with Create Own Course'],
   },
+  'bundle-fullstack': {
+    badge: 'Bundle',
+    accent: '#22c55e',
+    features: ['DSA + Node.js + React', 'Best full-stack value', 'Unlocks 3 premium courses'],
+  },
+  'bundle-interview': {
+    badge: 'Bundle',
+    accent: '#f59e0b',
+    features: ['DSA + System Design', 'Coding + HLD prep', 'Unlocks 2 premium courses'],
+  },
+  'bundle-frontend': {
+    badge: 'Bundle',
+    accent: '#38bdf8',
+    features: ['React + System Design', 'UI + architecture depth', 'Unlocks 2 premium courses'],
+  },
 };
+
+function productKindLabel(kind?: Product['kind']) {
+  if (kind === 'bundle') return 'Bundle';
+  if (kind === 'credit') return 'Credit';
+  return 'Course';
+}
 
 function formatInr(paise: number) {
   return `₹${(paise / 100).toFixed(0)}`;
@@ -91,9 +114,7 @@ export function BillingPageClient() {
         setPayments(history.payments);
         const ids = enrollments.enrollments.map((e) => e.productId);
         setEnrolled(new Set(ids));
-        for (const id of ids) {
-          if (COURSE_PRODUCT_IDS.has(id)) markLocalEnrollment(id);
-        }
+        markLocalEnrollments(ids.filter((id) => COURSE_PRODUCT_IDS.has(id)));
       } else {
         setPayments([]);
         setEnrolled(new Set());
@@ -120,12 +141,17 @@ export function BillingPageClient() {
     setLastUnlocked(null);
     try {
       const result = await startRazorpayCheckout(productId);
-      markLocalEnrollment(result.productId);
-      setEnrolled((prev) => new Set(prev).add(result.productId));
-      setLastUnlocked(result.productId);
+      markLocalEnrollments(result.productIds);
+      setEnrolled((prev) => {
+        const next = new Set(prev);
+        for (const id of result.productIds) next.add(id);
+        return next;
+      });
+      const firstCourse = result.productIds.find((id) => COURSE_PRODUCT_IDS.has(id)) ?? null;
+      setLastUnlocked(firstCourse);
       setMessage(
-        COURSE_PRODUCT_IDS.has(result.productId)
-          ? 'Payment successful! Course unlocked on Courses.'
+        result.productIds.some((id) => COURSE_PRODUCT_IDS.has(id))
+          ? 'Payment successful! Course access unlocked.'
           : 'Payment successful! Access unlocked.',
       );
       await refresh();
@@ -148,8 +174,8 @@ export function BillingPageClient() {
               <p className={styles.eyebrow}>Razorpay · Test mode</p>
               <h1>Billing</h1>
               <p className={styles.lead}>
-                Unlock premium courses or AI generation credits. Purchases sync instantly to your
-                Courses library.
+                Unlock premium courses, career bundles, or AI generation credits. Purchases sync
+                instantly to your Courses library.
               </p>
             </header>
 
@@ -174,13 +200,20 @@ export function BillingPageClient() {
             ) : (
               <div className={styles.grid}>
                 {products.map((p) => {
-                  const owned = enrolled.has(p.productId);
+                  const grants = p.grantsProductIds ?? [];
+                  const owned =
+                    enrolled.has(p.productId) ||
+                    (p.kind === 'bundle' &&
+                      grants.length > 0 &&
+                      grants.every((id) => enrolled.has(id)));
                   const ui = PRODUCT_UI[p.productId] || {
                     badge: 'Product',
                     accent: '#22c55e',
                     features: [p.description],
                   };
-                  const courseHref = learnPathForProduct(p.productId);
+                  const courseHref =
+                    learnPathForProduct(p.productId) ??
+                    (grants[0] ? learnPathForProduct(grants[0]) : null);
 
                   return (
                     <article
@@ -192,11 +225,7 @@ export function BillingPageClient() {
                       <div className={styles.cardBody}>
                         <div className={styles.badgeRow}>
                           <span className={styles.badge}>{ui.badge}</span>
-                          {COURSE_PRODUCT_IDS.has(p.productId) ? (
-                            <span className={styles.badgeMuted}>Course</span>
-                          ) : (
-                            <span className={styles.badgeMuted}>Credit</span>
-                          )}
+                          <span className={styles.badgeMuted}>{productKindLabel(p.kind)}</span>
                           {owned ? <span className={styles.ownedPill}>Owned</span> : null}
                         </div>
                         <h3 className={styles.cardTitle}>{p.title}</h3>

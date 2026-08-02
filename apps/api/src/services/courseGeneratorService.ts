@@ -107,7 +107,18 @@ export async function generateAndPersistCourse(input: GenerateCourseInput): Prom
   }
 
   console.log('[courses] generating structure...');
-  const structure = await generateCourseStructure(sourceContent, input.goal);
+  let structure: CourseStructureDTO;
+  try {
+    structure = await generateCourseStructure(sourceContent, input.goal);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[courses] structure generation failed:', msg);
+    throw new Error(
+      msg.includes('MISTRAL_API_KEY')
+        ? msg
+        : `AI outline failed: ${msg}. Check MISTRAL_API_KEY and API logs, then retry.`,
+    );
+  }
   console.log(
     '[courses] structure ready:',
     structure.title,

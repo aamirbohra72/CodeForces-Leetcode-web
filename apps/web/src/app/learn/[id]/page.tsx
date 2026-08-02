@@ -15,7 +15,7 @@ import {
 import { CATALOG_TOTALS } from '@/types/learning-progress';
 import { markCourseCompleted } from '@/lib/certificates';
 import { getAssignmentsForCourse } from '@/data/assignments';
-import { getTutorialsForCourse } from '@/data/tutorials/system-design';
+import { getTutorialsForCourse } from '@/data/tutorials/catalog-index';
 import { isLlmDrivenCourse, type LlmCoursePack } from '@/types/llm-course';
 
 const courseData: Record<
@@ -28,59 +28,80 @@ const courseData: Record<
     language: string;
     isPremium: boolean;
     category: string;
+    outcome: string;
     modules: { id: string; title: string; duration: string; completed: boolean }[];
   }
 > = {
   '1': {
     title: 'Salaam DSA',
     description:
-      'Master Data Structures and Algorithms with hands-on coding, clear explanations, and real-world problem-solving.',
+      'Master Data Structures and Algorithms with pattern-based modules: arrays, lists, stacks, trees, graphs, and DP — each with revision notes, flashcards, and practice quizzes.',
     rating: 4.9,
     reviews: 1000,
     language: 'English',
     isPremium: true,
     category: 'DSA',
-    modules: [
-      { id: '1', title: 'Introduction to DSA', duration: '2h 30m', completed: false },
-      { id: '2', title: 'Arrays and Strings', duration: '3h 15m', completed: false },
-      { id: '3', title: 'Linked Lists', duration: '2h 45m', completed: false },
-      { id: '4', title: 'Stacks and Queues', duration: '2h 20m', completed: false },
-      { id: '5', title: 'Trees and Binary Trees', duration: '4h 10m', completed: false },
-    ],
+    outcome: 'Solve interview DSA problems with clear patterns and complexity reasoning.',
+    modules: [],
   },
   '2': {
     title: 'Salaam Node.js',
-    description: 'From basics to advanced concepts, gain experience in building applications with Node.js.',
+    description:
+      'Build production Node APIs: event loop, Express, Prisma, auth/security, caching, and observability — with guided notes and quizzes every module.',
     rating: 4.8,
     reviews: 2000,
     language: 'English',
     isPremium: true,
     category: 'Backend',
-    modules: [
-      { id: '1', title: 'Node.js Fundamentals', duration: '2h 30m', completed: false },
-      { id: '2', title: 'Express.js Basics', duration: '3h 15m', completed: false },
-      { id: '3', title: 'Database Integration', duration: '2h 45m', completed: false },
-    ],
+    outcome: 'Ship secure, scalable Express services with solid data and ops habits.',
+    modules: [],
   },
   '3': {
     title: 'Salaam React',
     description:
-      'Learn React from scratch and build modern web applications with hooks, context, and more. Curriculum is generated live by AI for React/JS only.',
+      'Learn modern React end-to-end: hooks, effects, routing, performance, Next.js mental models, and UI quality — packed with flashcards and practice.',
     rating: 4.9,
     reviews: 1500,
     language: 'English',
     isPremium: true,
     category: 'Frontend',
+    outcome: 'Build interactive React apps with clean state, data fetching, and polish.',
+    modules: [],
+  },
+  '4': {
+    title: 'JavaScript Fundamentals',
+    description:
+      'Free starter track: language foundations, async JS, modern syntax, and browser patterns — perfect before React or Node.',
+    rating: 4.7,
+    reviews: 800,
+    language: 'English',
+    isPremium: false,
+    category: 'Frontend',
+    outcome: 'Write confident modern JavaScript with async and module basics.',
     modules: [],
   },
   '5': {
     title: 'System Design',
-    description: 'Learn to design scalable systems and ace your system design interviews.',
+    description:
+      'Design scalable systems for interviews: requirements, capacity, storage, caching, queues, and reliability — with HLD practice questions.',
     rating: 4.8,
     reviews: 1200,
     language: 'English',
     isPremium: true,
     category: 'System Design',
+    outcome: 'Lead HLD discussions with estimations, diagrams, and tradeoffs.',
+    modules: [],
+  },
+  '6': {
+    title: 'Python for Beginners',
+    description:
+      'Free Python on-ramp: core data types, functions, modern ergonomics, and applied topics like asyncio and simple APIs.',
+    rating: 4.6,
+    reviews: 650,
+    language: 'English',
+    isPremium: false,
+    category: 'Programming',
+    outcome: 'Write clean Python scripts and understand common libraries.',
     modules: [],
   },
 };
@@ -330,9 +351,31 @@ export default function CourseDetailPage() {
               </div>
             </div>
 
-            <h1 style={{ fontSize: '2.5rem', marginBottom: '1rem', fontWeight: 700 }}>{course.title.toUpperCase()}</h1>
-            <p style={{ fontSize: '1.1rem', color: '#b0b0b0', lineHeight: 1.6, marginBottom: '1rem' }}>
+            <h1 style={{ fontSize: '2.5rem', marginBottom: '0.75rem', fontWeight: 700 }}>{course.title.toUpperCase()}</h1>
+            <p style={{ fontSize: '1.1rem', color: '#b0b0b0', lineHeight: 1.6, marginBottom: '0.75rem' }}>
               {course.description}
+            </p>
+            <p
+              style={{
+                fontSize: '0.95rem',
+                color: '#86efac',
+                lineHeight: 1.5,
+                marginBottom: '1rem',
+                padding: '0.75rem 1rem',
+                borderRadius: 10,
+                background: 'rgba(34,197,94,0.08)',
+                border: '1px solid rgba(34,197,94,0.25)',
+              }}
+            >
+              <strong style={{ color: '#bbf7d0' }}>You will be able to: </strong>
+              {course.outcome}
+            </p>
+            <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginBottom: '1rem' }}>
+              {staticTutorials.length > 0
+                ? `${staticTutorials.length} guided modules · notes · flashcards · practice quizzes`
+                : llmCourse
+                  ? 'Live AI curriculum unlocks after enrollment'
+                  : 'Curriculum coming soon'}
             </p>
             {enrolled ? (
               <div style={{ marginBottom: '1.5rem', maxWidth: 420 }}>
@@ -391,7 +434,11 @@ export default function CourseDetailPage() {
                   ? '#f59e0b, #ef4444'
                   : course.category === 'System Design'
                     ? '#3b82f6, #8b5cf6'
-                    : '#ef4444, #dc2626'
+                    : course.category === 'Frontend'
+                      ? '#06b6d4, #2563eb'
+                      : course.category === 'Backend'
+                        ? '#ef4444, #b91c1c'
+                        : '#22c55e, #15803d'
               })`,
               borderRadius: 12,
               display: 'flex',
@@ -411,6 +458,56 @@ export default function CourseDetailPage() {
             </div>
           </div>
         </div>
+
+        {!enrolled && staticTutorials.length > 0 ? (
+          <div style={{ marginTop: '2rem' }}>
+            <h2 style={{ fontSize: '1.35rem', marginBottom: '0.75rem' }}>Curriculum preview</h2>
+            <p style={{ color: '#94a3b8', marginBottom: '1rem', fontSize: '0.9rem' }}>
+              Enroll to unlock notes, flashcards, and practice quizzes for every module.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {staticTutorials.map((t, index) => (
+                <div
+                  key={t.id}
+                  style={{
+                    background: '#222',
+                    border: '1px solid #333',
+                    borderRadius: 10,
+                    padding: '1rem 1.25rem',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    gap: '1rem',
+                    alignItems: 'center',
+                    opacity: 0.92,
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: 12, color: '#64748b', marginBottom: 4 }}>
+                      Module {index + 1} · {t.duration}
+                    </div>
+                    <div style={{ fontWeight: 600 }}>{t.title}</div>
+                    <div style={{ fontSize: 13, color: '#94a3b8', marginTop: 4 }}>{t.videoTitle}</div>
+                  </div>
+                  <span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      letterSpacing: '0.04em',
+                      color: '#fbbf24',
+                      background: 'rgba(245,158,11,0.12)',
+                      border: '1px solid rgba(245,158,11,0.35)',
+                      borderRadius: 999,
+                      padding: '0.35rem 0.7rem',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    LOCKED
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         {enrolled && (
           <div style={{ marginTop: '2rem' }}>

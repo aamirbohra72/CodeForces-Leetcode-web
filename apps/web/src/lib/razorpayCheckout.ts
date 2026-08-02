@@ -2,7 +2,7 @@
 
 import { api } from '@/lib/api';
 import { getToken } from '@/lib/auth';
-import { markLocalEnrollment } from '@/lib/enrollment';
+import { markLocalEnrollments } from '@/lib/enrollment';
 
 export type CreateOrderResponse = {
   orderId: string;
@@ -12,6 +12,19 @@ export type CreateOrderResponse = {
   productTitle: string;
   keyId: string;
   paymentDbId: string;
+  grantsProductIds?: string[];
+};
+
+export type VerifyPaymentResponse = {
+  ok: boolean;
+  alreadyPaid?: boolean;
+  productId: string;
+  productIds?: string[];
+};
+
+export type CheckoutResult = {
+  productId: string;
+  productIds: string[];
 };
 
 declare global {
@@ -38,7 +51,7 @@ function loadRazorpayScript(): Promise<boolean> {
   });
 }
 
-export async function startRazorpayCheckout(productId: string): Promise<{ productId: string }> {
+export async function startRazorpayCheckout(productId: string): Promise<CheckoutResult> {
   if (!getToken()) {
     throw new Error('Please sign in before paying');
   }
@@ -63,13 +76,18 @@ export async function startRazorpayCheckout(productId: string): Promise<{ produc
         razorpay_signature: string;
       }) => {
         try {
-          await api.post('/payments/verify', {
+          const verified = await api.post<VerifyPaymentResponse>('/payments/verify', {
             razorpay_order_id: response.razorpay_order_id,
             razorpay_payment_id: response.razorpay_payment_id,
             razorpay_signature: response.razorpay_signature,
           });
-          markLocalEnrollment(order.productId);
-          resolve({ productId: order.productId });
+          const productIds =
+            verified.productIds?.length
+              ? verified.productIds
+              : [order.productId, ...(order.grantsProductIds ?? [])];
+          const unique = Array.from(new Set(productIds));
+          markLocalEnrollments(unique);
+          resolve({ productId: order.productId, productIds: unique });
         } catch (err) {
           reject(err instanceof Error ? err : new Error('Payment verification failed'));
         }
