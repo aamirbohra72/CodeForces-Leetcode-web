@@ -23,7 +23,11 @@ function usernameFromEmail(email: string, clerkUserId: string): string {
 export async function exchangeClerkSession(clerkJwt: string) {
   const secretKey = getClerkSecret();
 
-  const payload = await verifyToken(clerkJwt, { secretKey });
+  // Small skew covers mint→verify latency and minor clock drift
+  const payload = await verifyToken(clerkJwt, {
+    secretKey,
+    clockSkewInMs: 15_000,
+  });
   const clerkUserId = payload.sub;
   if (!clerkUserId) {
     throw new Error('INVALID_CLERK_TOKEN');

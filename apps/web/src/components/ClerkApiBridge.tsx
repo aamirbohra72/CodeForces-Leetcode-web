@@ -41,16 +41,28 @@ export function ClerkApiBridge() {
 
     (async () => {
       try {
-        const clerkToken = await getToken();
-        if (!clerkToken) return;
+        // skipCache avoids sending a near-expiry JWT that dies in flight
+        const exchange = async () => {
+          const clerkToken = await getToken({ skipCache: true });
+          if (!clerkToken) return null;
 
-        const res = await fetch(`${API_URL}/auth/clerk-exchange`, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${clerkToken}`,
-            'Content-Type': 'application/json',
-          },
-        });
+          return fetch(`${API_URL}/auth/clerk-exchange`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${clerkToken}`,
+              'Content-Type': 'application/json',
+            },
+          });
+        };
+
+        let res = await exchange();
+        if (!res) return;
+
+        // One retry if the token expired between mint and verify
+        if (res.status === 401) {
+          res = await exchange();
+          if (!res) return;
+        }
 
         if (!res.ok) {
           const body = (await res.json().catch(() => ({}))) as { error?: string };

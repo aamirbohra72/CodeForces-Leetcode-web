@@ -1,4 +1,9 @@
 import nodemailer, { type Transporter } from 'nodemailer';
+import {
+  PLATFORM_BRAND_NAME,
+  buildOtpEmailHtml,
+  wrapPlatformEmail,
+} from './emailTemplates';
 
 type SmtpConfig = {
   host: string;
@@ -52,7 +57,7 @@ function getBrevoConfig(): BrevoConfig | null {
   const senderEmail = getSenderEmail();
   if (!senderEmail) return null;
 
-  const senderName = process.env.BREVO_SENDER_NAME?.trim() || 'Codeforces Platform';
+  const senderName = process.env.BREVO_SENDER_NAME?.trim() || PLATFORM_BRAND_NAME;
 
   // SMTP master key from Brevo "SMTP & API" → SMTP
   if (key.startsWith('xsmtpsib-')) {
@@ -123,17 +128,6 @@ export function getEmailDeliveryMode(): EmailDeliveryMode {
   if (getBrevoConfig()) return 'brevo';
   if (getSmtpConfig()) return 'smtp';
   return 'console';
-}
-
-function otpHtml(otp: string): string {
-  return `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <h2>Your Login OTP</h2>
-      <p>Your OTP code is: <strong style="font-size: 24px; color: #0070f3;">${otp}</strong></p>
-      <p>This code will expire in 10 minutes.</p>
-      <p>If you didn't request this code, please ignore this email.</p>
-    </div>
-  `;
 }
 
 async function sendViaBrevoApi(
@@ -231,8 +225,7 @@ export function assertEmailConfigForRuntime(): void {
 
 export async function sendOTPEmail(email: string, otp: string): Promise<void> {
   const mode = getEmailDeliveryMode();
-  const subject = 'Your Login OTP - Codeforces Platform';
-  const html = otpHtml(otp);
+  const { subject, html } = buildOtpEmailHtml(otp);
 
   if (mode === 'console') {
     if (process.env.NODE_ENV === 'production') {
@@ -268,8 +261,28 @@ export async function sendOTPEmail(email: string, otp: string): Promise<void> {
 export async function sendTransactionalEmail(input: {
   to: string;
   subject: string;
-  html: string;
+  /** Full HTML email. If omitted, use wrapInBrandLayout + bodyHtml. */
+  html?: string;
+  wrapInBrandLayout?: boolean;
+  title?: string;
+  preheader?: string;
+  bodyHtml?: string;
+  cta?: { label: string; href: string };
 }): Promise<void> {
+  const html =
+    input.wrapInBrandLayout || (!input.html && input.bodyHtml)
+      ? wrapPlatformEmail({
+          title: input.title || input.subject,
+          preheader: input.preheader,
+          bodyHtml: input.bodyHtml || input.html || '',
+          cta: input.cta,
+        })
+      : input.html;
+
+  if (!html) {
+    throw new Error('Email html or bodyHtml is required');
+  }
+
   const mode = getEmailDeliveryMode();
   if (mode === 'console') {
     if (process.env.NODE_ENV === 'production') {
@@ -280,7 +293,7 @@ export async function sendTransactionalEmail(input: {
   }
 
   if (mode === 'brevo') {
-    await sendWithBrevo(input.to, input.subject, input.html);
+    await sendWithBrevo(input.to, input.subject, html);
     return;
   }
 
@@ -290,6 +303,6 @@ export async function sendTransactionalEmail(input: {
     from: config.from,
     to: input.to,
     subject: input.subject,
-    html: input.html,
+    html,
   });
 }
